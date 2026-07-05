@@ -1,0 +1,19 @@
+# build outputs
+backend/target/
+backend/bin/
+frontend/dist/
+
+# dependencies
+frontend/node_modules/
+
+# runtime data
+backend/data/
+backend/*.log
+frontend/*.log
+
+# local workflow notes
+.slim/deepwork/
+
+# system files
+.DS_Store
+Thumbs.db
