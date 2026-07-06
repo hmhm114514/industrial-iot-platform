@@ -1,13 +1,13 @@
 # database
 
-本目录提供课程交付用 MySQL 脚本。后端默认使用 H2 文件数据库 `./data/iot-platform-db`，启动时由 JPA 自动建表并初始化演示数据；如需切换 MySQL，可先执行：
+本目录提供项目交付用 MySQL 脚本。后端默认使用 H2 文件数据库 `./data/iot-platform-db`，启动时由 JPA 自动建表并初始化样例数据；如需切换 MySQL，可先执行：
 
 ```bash
 mysql -uroot -p < schema-mysql.sql
 mysql -uroot -p < data-mysql.sql
 ```
 
-然后在 `backend/src/main/resources/application.yml` 中将 datasource 改为 MySQL 连接，例如：
+然后在后端微服务的 `src/main/resources/application.yml` 中将 datasource 改为 MySQL 连接，例如 `platform-core-service` 和 `visual-video-service` 的数据源配置：
 
 ```yaml
 spring:

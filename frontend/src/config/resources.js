@@ -154,7 +154,7 @@ export const resourceConfigs = {
       { prop: 'updatedAt', label: '更新时间', width: 180 }
     ],
     fields: [textField('name', '大屏名称'), textField('groupName', '分组'), textField('configJson', '组件配置 JSON')],
-    preview: '数据中台 / 设备拓扑 / 告警态势 / 能耗排行'
+    preview: '运行指标 / 告警态势 / 消息趋势 / 设备状态'
   },
   gbDevice: {
     title: '国标设备',

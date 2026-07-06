@@ -47,9 +47,6 @@
               <span>{{ item.label || item.name }}</span><b>{{ item.value }}</b>
             </li>
           </ul>
-          <div v-if="widget.type === 'topology'" class="node-map live-node-map">
-            <i v-for="item in widget.items" :key="item.id || item.name" :class="item.tone" :style="item.style" />
-          </div>
         </div>
       </div>
     </div>
@@ -80,7 +77,6 @@ const selectedId = ref(null)
 const currentScreen = ref(null)
 const dashboard = ref({ stats: {}, messageTrend: [], statusRatio: [], alarmTrend: [] })
 const devices = ref([])
-const alarms = ref([])
 const fallbackMode = ref(false)
 const editorVisible = ref(false)
 const saving = ref(false)
@@ -92,21 +88,26 @@ const defaultConfig = {
     { id: 'online-stat', type: 'stat', title: '在线设备', metric: 'onlineDevices', span: 1 },
     { id: 'alarm-stat', type: 'stat', title: '当前告警', metric: 'alarms', tone: 'warn', span: 1 },
     { id: 'message-trend', type: 'trend', title: '消息趋势', metric: 'messageTrend', span: 2 },
-    { id: 'device-list', type: 'list', title: '设备运行状态', metric: 'devices', span: 1 },
-    { id: 'topology', type: 'topology', title: '设备拓扑', metric: 'topology', span: 2 }
+    { id: 'device-list', type: 'list', title: '设备运行状态', metric: 'devices', span: 1 }
   ]
 }
+
+const stripTopologyWidgets = (input = {}) => ({
+  ...input,
+  widgets: Array.isArray(input.widgets) ? input.widgets.filter((widget) => widget?.type !== 'topology') : []
+})
 
 const config = computed(() => {
   try {
     const parsed = JSON.parse(currentScreen.value?.configJson || '')
-    return parsed?.widgets?.length && typeof parsed.widgets[0] === 'object' ? parsed : defaultConfig
+    const sanitized = stripTopologyWidgets(parsed)
+    return sanitized.widgets.length && typeof sanitized.widgets[0] === 'object' ? sanitized : defaultConfig
   } catch {
     return defaultConfig
   }
 })
 
-const widgets = computed(() => config.value.widgets.map((widget) => buildWidget(widget)))
+const widgets = computed(() => config.value.widgets.filter((widget) => widget?.type !== 'topology').map((widget) => buildWidget(widget)))
 
 const buildWidget = (widget) => {
   if (!widget || typeof widget !== 'object') return { id: String(widget || 'widget'), type: 'stat', title: '设备总数', metric: 'devices', value: 0, subtext: '平台统计' }
@@ -118,28 +119,19 @@ const buildWidget = (widget) => {
   }
   if (widget.type === 'trend') return { ...widget, items: dashboard.value[widget.metric] || [] }
   if (widget.type === 'list') return { ...widget, items: devices.value.slice(0, 5).map((item) => ({ label: item.name, value: item.online ? '在线' : '离线' })) }
-  if (widget.type === 'topology') {
-    return { ...widget, items: devices.value.slice(0, 8).map((item, index) => ({
-      ...item,
-      tone: item.online ? 'online' : alarms.value.some((alarm) => alarm.deviceName === item.name && alarm.status !== '已处理') ? 'alarm' : '',
-      style: { left: `${12 + (index * 17) % 76}%`, top: `${24 + (index * 29) % 58}%` }
-    })) }
-  }
   return widget
 }
 
 const load = async () => {
   try {
-    const [screenRows, dash, deviceRows, alarmRows] = await Promise.all([
+    const [screenRows, dash, deviceRows] = await Promise.all([
       resourceApi.list('screen'),
       dashboardApi.get(),
-      resourceApi.list('device'),
-      resourceApi.list('historicalAlarm')
+      resourceApi.list('device')
     ])
     screens.value = Array.isArray(screenRows) ? screenRows : []
     dashboard.value = dash || dashboard.value
     devices.value = Array.isArray(deviceRows) ? deviceRows : []
-    alarms.value = Array.isArray(alarmRows) ? alarmRows : []
     fallbackMode.value = false
   } catch (error) {
     quietError(error, '大屏数据服务暂不可用，当前展示本地驾驶舱模板')
@@ -147,7 +139,6 @@ const load = async () => {
     screens.value = [{ id: 'local-screen', name: '智慧工厂运行驾驶舱', groupName: '默认分组', published: false, configJson: JSON.stringify(defaultConfig, null, 2) }]
     dashboard.value = { stats: { devices: 0, onlineDevices: 0, alarms: 0 }, messageTrend: [] }
     devices.value = []
-    alarms.value = []
   }
   const next = screens.value.find((item) => item.published) || screens.value[0]
   if (next) selectScreen(next.id)
@@ -160,15 +151,24 @@ const selectScreen = (id) => {
 
 const openEditor = () => {
   const screen = currentScreen.value || { name: '智慧工厂运行驾驶舱', groupName: '默认分组', configJson: JSON.stringify(defaultConfig, null, 2) }
-  Object.assign(editForm, { id: screen.id, name: screen.name, groupName: screen.groupName || screen.group || '默认分组', configJson: screen.configJson || JSON.stringify(defaultConfig, null, 2) })
+  let configJson = screen.configJson || JSON.stringify(defaultConfig, null, 2)
+  try {
+    configJson = JSON.stringify(stripTopologyWidgets(JSON.parse(configJson)), null, 2)
+  } catch {
+    configJson = JSON.stringify(defaultConfig, null, 2)
+  }
+  Object.assign(editForm, { id: screen.id, name: screen.name, groupName: screen.groupName || screen.group || '默认分组', configJson })
   editorVisible.value = true
 }
 
 const saveScreen = async () => {
   saving.value = true
   try {
-    JSON.parse(editForm.configJson || '{}')
-    const payload = { name: editForm.name, groupName: editForm.groupName, configJson: editForm.configJson, status: currentScreen.value?.status || 'DRAFT', published: currentScreen.value?.published || false }
+    const parsed = JSON.parse(editForm.configJson || '{}')
+    const hadTopology = Array.isArray(parsed.widgets) && parsed.widgets.some((widget) => widget?.type === 'topology')
+    const sanitizedConfig = stripTopologyWidgets(parsed)
+    if (hadTopology) ElMessage.warning('已过滤已下线组件，保存内容不再包含该类型')
+    const payload = { name: editForm.name, groupName: editForm.groupName, configJson: JSON.stringify(sanitizedConfig, null, 2), status: currentScreen.value?.status || 'DRAFT', published: currentScreen.value?.published || false }
     if (editForm.id && editForm.id !== 'local-screen') await resourceApi.update('screen', editForm.id, payload)
     else await resourceApi.create('screen', payload)
     ElMessage.success('大屏布局已保存')
@@ -206,6 +206,4 @@ onMounted(load)
 .screen-panel ul { list-style: none; margin: 0; padding: 0; display: grid; gap: 10px; }
 .screen-panel li { display: flex; justify-content: space-between; gap: 12px; padding: 10px 12px; border-radius: 12px; background: rgba(255, 255, 255, .05); }
 .screen-panel li b { color: #fff; }
-.live-node-map i.online { background: #19d27c; }
-.live-node-map i.alarm { background: #ff4d5e; box-shadow: 0 0 0 10px rgba(255,77,94,.14); }
 </style>

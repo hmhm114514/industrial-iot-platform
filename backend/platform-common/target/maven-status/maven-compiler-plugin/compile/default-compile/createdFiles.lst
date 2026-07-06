@@ -1,0 +1,4 @@
+com\practice\common\BaseEntity.class
+com\practice\common\CrudSupport.class
+com\practice\common\ApiResponse.class
+com\practice\common\GlobalExceptionHandler.class

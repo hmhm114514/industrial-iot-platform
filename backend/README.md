@@ -1,17 +1,65 @@
 # Industrial IoT Platform Backend
 
-Spring Boot 3 + Java 17 + Maven 的工业互联网/物联网平台课程实践后端。
+Spring Boot 3 + Java 17 + Maven 的工业互联网/物联网平台微服务后端。
+
+## 服务结构
+
+```text
+backend/
+  pom.xml                  Maven parent
+  platform-common/         公共模型与工具模块
+  platform-core-service/   平台核心服务，端口 8081
+  visual-video-service/    可视化与视频服务，端口 8082
+  gateway-service/         API 网关服务，端口 8080
+```
+
+前端和外部调用统一访问 `gateway-service` 的 `/api/**`，网关负责转发到平台核心服务和可视化视频服务。前端 Vite 代理仍指向 `http://localhost:8080`。
 
 ## 启动
 
+`backend/pom.xml` 是 Maven parent，父工程没有 Spring Boot 启动类，因此不要在 `backend` 根目录直接执行：
+
 ```bash
-cd industrial-iot-platform/backend
 mvn spring-boot:run
 ```
 
-- 服务地址：`http://localhost:8080`
-- H2 Console：`http://localhost:8080/h2-console`
-- H2 JDBC URL：`jdbc:h2:file:./data/iot-platform-db;MODE=MySQL;DATABASE_TO_LOWER=TRUE;AUTO_SERVER=TRUE`
+Windows PowerShell 推荐使用一键启动脚本：
+
+```powershell
+cd backend
+.\start-all.ps1
+```
+
+如果 PowerShell 执行策略阻止脚本运行，可以使用：
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\start-all.ps1
+```
+
+也可以使用批处理脚本：
+
+```bat
+start-all.bat
+```
+
+启动脚本会先执行 `mvn -q -DskipTests package`，再用 `java -jar` 分别启动三个服务；不需要执行 `mvn install`。
+
+手动启动时需要分别打开 3 个终端：
+
+```bash
+cd backend && mvn -q -DskipTests package
+java -jar platform-core-service/target/platform-core-service-0.0.1-SNAPSHOT.jar
+java -jar visual-video-service/target/visual-video-service-0.0.1-SNAPSHOT.jar
+java -jar gateway-service/target/gateway-service-0.0.1-SNAPSHOT.jar
+```
+
+- 网关地址：`http://localhost:8080`
+- 平台核心服务：`http://localhost:8081`
+- 可视化视频服务：`http://localhost:8082`
+- 前端统一 API 入口：`http://localhost:8080/api/**`
+- H2 Console：按实际服务配置访问对应端口
+- 核心服务 H2 JDBC URL：`jdbc:h2:file:./data/platform-core-db;MODE=MySQL;DATABASE_TO_LOWER=TRUE;AUTO_SERVER=TRUE`
+- 可视化视频服务 H2 JDBC URL：`jdbc:h2:file:./data/visual-video-db;MODE=MySQL;DATABASE_TO_LOWER=TRUE;AUTO_SERVER=TRUE`
 - 默认账号：`admin / 123456`
 
 ## 鉴权
@@ -55,7 +103,7 @@ Authorization: Bearer panda-iot-demo-token
 - `POST /api/tasks/{id}/stop` 停止任务并生成任务日志
 - `GET /api/tasks/logs` 任务日志
 
-### 演示模块
+### 扩展能力
 
 - `GET/POST/PUT/DELETE /api/network-services` 网络服务 CRUD
 - `POST /api/network-services/{id}/start|stop` 网络服务启停
@@ -67,7 +115,7 @@ Authorization: Bearer panda-iot-demo-token
 - `GET/POST/PUT/DELETE /api/video-alarm-tasks` 视频告警任务 CRUD
 - `GET/POST/PUT/DELETE /api/firmwares` 固件台账 CRUD
 - `POST /api/firmwares/{id}/upgrade` 固件升级状态修改
-- `GET /api/dashboard/monitor` 服务监控模拟数据
+- `GET /api/dashboard/monitor` 服务监控样例数据
 - `GET/POST/PUT/DELETE /api/users` 用户管理
 - `GET/POST/PUT/DELETE /api/roles` 角色管理
 - `GET /api/operation-logs` 操作日志
@@ -75,7 +123,7 @@ Authorization: Bearer panda-iot-demo-token
 
 列表接口支持 `?keyword=xxx` 关键词筛选；继承通用 CRUD 的关键实体支持 `POST /api/{resource}/{id}/toggle` 状态切换。
 
-## 演示链路
+## 业务验证链路
 
 1. 使用 `admin/123456` 登录。
 2. 新增产品、设备分组、设备，或使用内置样例：`PandaX温湿度采集器`、`注塑机温度传感器01`。

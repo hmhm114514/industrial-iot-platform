@@ -2,9 +2,11 @@
 
 ## 1. 接口约定
 
-- 后端基础地址：`http://localhost:8080`
+- 后端统一入口：`gateway-service`，`http://localhost:8080`
+- 平台核心服务：`platform-core-service`，`http://localhost:8081`
+- 可视化视频服务：`visual-video-service`，`http://localhost:8082`
 - API 统一前缀：`/api`
-- 前端开发代理：`/api -> http://localhost:8080`
+- 前端开发代理：`/api -> http://localhost:8080`，前端不直接访问 8081/8082
 - 鉴权方式：除登录接口外，请求头携带 `Authorization: Bearer panda-iot-demo-token`
 - 统一响应结构：
 
@@ -28,7 +30,7 @@
 | --- | --- | --- | --- |
 | GET | `/api/dashboard/summary` | 获取统计卡片数据 | 产品数、分组数、设备数、在线设备数、告警数、任务数等 |
 | GET | `/api/dashboard/charts` | 获取图表数据 | 设备状态、告警等级、近 7 日、最近遥测和告警 |
-| GET | `/api/dashboard/monitor` | 获取服务监控 | CPU、内存、磁盘、MQTT、HTTP、JVM 线程等演示指标 |
+| GET | `/api/dashboard/monitor` | 获取服务监控 | CPU、内存、磁盘、MQTT、HTTP、JVM 线程等样例指标 |
 
 ## 4. 设备管理接口
 
@@ -58,7 +60,7 @@
 | POST | `/api/telemetry/simulate` | 模拟设备遥测上报 | Body：`deviceId`、`temperature`、`humidity`、`pressure` |
 | GET | `/api/telemetry` | 查询最近 50 条遥测数据 | 按 `reportTime` 倒序 |
 | GET | `/api/alarms` | 查询告警列表 | 可选 `keyword` |
-| POST | `/api/alarms` | 新增告警 | 演示/测试使用 |
+| POST | `/api/alarms` | 新增告警 | 本地验证或数据维护使用 |
 | PUT | `/api/alarms/{id}` | 修改告警 | 路径参数 `id` |
 | DELETE | `/api/alarms/{id}` | 删除告警 | 路径参数 `id` |
 | POST | `/api/alarms/{id}/handle` | 处置告警 | Body：`handler`、`remark` |
@@ -104,7 +106,7 @@
 | --- | --- | --- | --- |
 | GET | `/api/video-devices` | 查询视频设备 | 摄像头/国标设备台账 |
 | POST | `/api/video-devices` | 新增视频设备 | `channelNo`、`streamUrl`、`location` |
-| GET | `/api/video-streams` | 查询拉流代理 | FLV/HLS/RTSP 等演示代理 |
+| GET | `/api/video-streams` | 查询流代理配置 | FLV/HLS/RTSP 等代理配置记录 |
 | POST | `/api/video-streams` | 新增拉流代理 | `videoDeviceId`、`playUrl`、`protocol` |
 | GET | `/api/video-alarm-tasks` | 查询视频告警任务 | 算法任务台账 |
 | POST | `/api/video-alarm-tasks` | 新增视频告警任务 | `videoDeviceId`、`algorithm`、`enabled` |
@@ -130,6 +132,6 @@
 | GET | `/api/roles` | 查询角色 | 角色和权限字符串 |
 | POST | `/api/roles` | 新增角色 | `permissions` |
 | GET | `/api/firmwares` | 查询固件 | 固件版本和升级状态 |
-| POST | `/api/firmwares/{id}/upgrade` | 固件升级演示 | Body 可传 `status`，默认 `UPGRADING` |
+| POST | `/api/firmwares/{id}/upgrade` | 固件升级状态修改 | Body 可传 `status`，默认 `UPGRADING` |
 | GET | `/api/operation-logs` | 查询操作日志 | 模块、动作、操作人、详情 |
 | GET | `/api/login-logs` | 查询登录日志 | 用户名、IP、成功状态 |
