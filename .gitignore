@@ -17,3 +17,9 @@ frontend/*.log
 # system files
 .DS_Store
 Thumbs.db
+
+target/
+*.class
+*.jar
+*.original
+maven-status/
