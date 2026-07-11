@@ -32,7 +32,7 @@ export const menus = [
     icon: 'Monitor',
     children: [
       { title: '大屏分组', path: '/screen/groups', kind: 'screenGroup' },
-      { title: '组态大屏', path: '/screen/designer', kind: 'screen' },
+      { title: '组态大屏', path: '/screen/designer', kind: 'screen', special: 'ScreenDesigner' },
       { title: '可视化大屏', path: '/screen/visual', special: 'VisualScreens' }
     ]
   },

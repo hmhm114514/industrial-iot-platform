@@ -6,6 +6,7 @@ import GenericResource from '../views/GenericResource.vue'
 import DeviceMap from '../views/DeviceMap.vue'
 import Rules from '../views/Rules.vue'
 import VisualScreens from '../views/VisualScreens.vue'
+import ScreenDesigner from '../views/ScreenDesigner.vue'
 import LocalCameraDevices from '../views/LocalCameraDevices.vue'
 import VideoSquare from '../views/VideoSquare.vue'
 import HistoryData from '../views/HistoryData.vue'
@@ -23,6 +24,7 @@ const specialComponents = {
   DeviceMap,
   Rules,
   VisualScreens,
+  ScreenDesigner,
   LocalCameraDevices,
   VideoSquare,
   HistoryData,
