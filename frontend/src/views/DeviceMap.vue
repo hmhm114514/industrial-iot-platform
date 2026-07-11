@@ -4,7 +4,6 @@
       <div>
         <el-tag effect="dark" class="hero-tag">真实地图</el-tag>
         <h1>设备地图</h1>
-        <p>基于真实世界底图展示设备位置，仅渲染具备合法经纬度的设备。</p>
       </div>
       <div class="module-actions">
         <el-input

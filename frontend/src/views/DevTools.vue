@@ -1,7 +1,7 @@
 <template>
   <div class="page-stack dev-tools-page">
     <section class="module-head">
-      <div><el-tag effect="dark" class="hero-tag">开发工具</el-tag><h1>开发工具</h1><p>提供代码片段生成和设备报文生成能力，辅助课程联调与功能扩展。</p></div>
+      <div><el-tag effect="dark" class="hero-tag">开发工具</el-tag><h1>开发工具</h1></div>
     </section>
     <el-tabs v-model="activeTab" class="tool-tabs">
       <el-tab-pane label="代码生成" name="code">

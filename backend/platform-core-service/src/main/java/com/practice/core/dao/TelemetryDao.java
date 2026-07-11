@@ -4,4 +4,4 @@ package com.practice.core.dao;
     import java.time.LocalDateTime;
 import java.util.List;
 
-    public interface TelemetryDao extends JpaRepository<TelemetryData, Long> { List<TelemetryData> findTop50ByOrderByReportTimeDesc(); long countByReportTimeAfter(LocalDateTime time); List<TelemetryData> findByReportTimeAfter(LocalDateTime start); }
+    public interface TelemetryDao extends JpaRepository<TelemetryData, Long> { List<TelemetryData> findTop50ByOrderByReportTimeDesc(); List<TelemetryData> findAllByOrderByReportTimeDesc(); long countByReportTimeAfter(LocalDateTime time); List<TelemetryData> findByReportTimeAfter(LocalDateTime start); }

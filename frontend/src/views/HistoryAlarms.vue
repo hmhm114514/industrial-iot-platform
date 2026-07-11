@@ -1,13 +1,13 @@
 <template>
   <div class="page-stack">
     <section class="module-head">
-      <div><el-tag effect="dark" class="hero-tag">告警闭环</el-tag><h1>历史告警</h1><p>查询规则触发的告警，并完成处置闭环。</p></div>
-      <div class="module-actions"><el-input v-model="keyword" placeholder="设备 / 告警标题" clearable class="search-input" /><el-button type="primary" @click="load">查询</el-button></div>
+      <div><el-tag effect="dark" class="hero-tag">告警闭环</el-tag><h1>历史告警</h1></div>
+      <div class="module-actions"><el-input v-model="keyword" placeholder="设备 / 告警标题" clearable class="search-input" /><el-button type="primary" @click="search">查询</el-button></div>
     </section>
     <el-card class="table-card" shadow="never">
-      <el-table :data="filteredRows" stripe>
+      <el-table :data="pagedRows" stripe>
         <el-table-column label="序号" width="80" align="center">
-          <template #default="{ $index }">{{ $index + 1 }}</template>
+          <template #default="{ $index }">{{ (page.current - 1) * page.size + $index + 1 }}</template>
         </el-table-column>
         <el-table-column prop="title" label="告警标题" min-width="180" />
         <el-table-column prop="deviceName" label="设备" min-width="190" />
@@ -19,6 +19,9 @@
         <el-table-column prop="time" label="时间" width="190" />
         <el-table-column label="操作" width="150" fixed="right"><template #default="{ row }"><el-button link type="primary" @click="openDetail(row)">查看</el-button><el-button link type="primary" :disabled="row.status === '已处理'" @click="openHandle(row)">处置</el-button></template></el-table-column>
       </el-table>
+      <div class="table-pagination">
+        <el-pagination v-model:current-page="page.current" v-model:page-size="page.size" :page-sizes="[10, 20, 50]" layout="total, sizes, prev, pager, next" :total="filteredRows.length" />
+      </div>
     </el-card>
     <el-dialog v-model="detailVisible" :title="detailTitle" width="560px">
       <el-table :data="currentMetrics" :row-class-name="metricRowClass" stripe>
@@ -33,7 +36,7 @@
 </template>
 
 <script setup>
-import { computed, onBeforeUnmount, onMounted, reactive, ref } from 'vue'
+import { computed, onBeforeUnmount, onMounted, reactive, ref, watch } from 'vue'
 import { ElMessage } from 'element-plus'
 import { alarmApi, resourceApi, telemetryMetrics } from '../api/platform'
 import { quietError } from '../api/http'
@@ -47,12 +50,14 @@ const visible = ref(false)
 const detailVisible = ref(false)
 const currentId = ref(null)
 const currentDetail = ref(null)
+const page = reactive({ current: 1, size: 20 })
 const form = reactive({ title: '', remark: '已现场复核并恢复正常。' })
 const timeValue = (row) => new Date(row.createdAt || row.time || 0).getTime() || 0
 const filteredRows = computed(() => rows.value
   .filter((row) => !keyword.value || JSON.stringify(row).includes(keyword.value))
   .slice()
   .sort((a, b) => timeValue(b) - timeValue(a)))
+const pagedRows = computed(() => filteredRows.value.slice((page.current - 1) * page.size, page.current * page.size))
 const detailTitle = computed(() => currentDetail.value ? `${currentDetail.value.deviceName || '设备'} - 指标详情` : '指标详情')
 const currentMetrics = computed(() => currentDetail.value?.metrics || [])
 const fallbackMetrics = (row) => [{ metric: 'trigger', label: '触发值', value: row.value || '-', unit: '' }]
@@ -92,9 +97,11 @@ const openDetail = (row) => {
   detailVisible.value = true
 }
 const load = async () => { try { const [alarms, telemetry, ruleList] = await Promise.all([resourceApi.list('historicalAlarm', { keyword: keyword.value }), resourceApi.list('historicalData'), resourceApi.list('rule')]); rows.value = normalizeList(alarms); telemetryRows.value = normalizeList(telemetry); rules.value = normalizeList(ruleList) } catch (error) { quietError(error, '数据服务暂不可用，当前为演示数据'); rows.value = clone(fallbackRows.historicalAlarm); rules.value = clone(fallbackRows.rule || []); telemetryRows.value = clone(fallbackRows.historicalData).map((row) => ({ ...row, metrics: [{ metric: row.metric, label: telemetryMetrics.find((item) => item.value === row.metric)?.label || row.metric, value: row.value, unit: row.unit }] })) } }
+const search = async () => { page.current = 1; await load() }
 const openHandle = (row) => { currentId.value = row.id; form.title = row.title; form.remark = '已现场复核并恢复正常。'; visible.value = true }
 const submitHandle = async () => { const user = JSON.parse(localStorage.getItem('iot_user') || '{}'); try { await alarmApi.handle(currentId.value, { remark: form.remark, handler: user.realName || user.username || 'admin' }); ElMessage.success('告警已处置'); await load() } catch (error) { quietError(error, '告警处置失败，后端数据未变更') } visible.value = false }
 const handleRealtime = (event) => { if (event.detail?.type === 'telemetry') load() }
+watch(() => [keyword.value, page.size], () => { page.current = 1 })
 onMounted(() => {
   load()
   window.addEventListener('iot-realtime', handleRealtime)

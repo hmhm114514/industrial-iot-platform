@@ -4,7 +4,6 @@
       <div>
         <el-tag effect="dark" class="hero-tag">{{ cfg.accent || '模块' }}</el-tag>
         <h1>{{ cfg.title }}</h1>
-        <p>{{ cfg.subtitle }}</p>
       </div>
       <div class="module-actions">
         <el-input v-model="keyword" :placeholder="cfg.searchable || '输入关键字搜索'" clearable class="search-input" @keyup.enter="load" />

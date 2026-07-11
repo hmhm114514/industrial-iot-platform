@@ -44,7 +44,7 @@
             <el-breadcrumb separator="/" class="breadcrumb">
               <el-breadcrumb-item v-for="item in trail" :key="item">{{ item }}</el-breadcrumb-item>
             </el-breadcrumb>
-            <div class="page-kicker">{{ today }} · 设备接入、数据治理、规则告警一体化</div>
+            <div class="page-kicker">{{ today }}</div>
           </div>
         </div>
         <div class="topbar-actions">

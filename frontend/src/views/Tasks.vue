@@ -1,7 +1,7 @@
 <template>
   <div class="page-stack">
     <section class="module-head">
-      <div><el-tag effect="dark" class="hero-tag">任务中心</el-tag><h1>任务中心</h1><p>管理定时任务，支持启停、查看执行日志。</p></div>
+      <div><el-tag effect="dark" class="hero-tag">任务中心</el-tag><h1>任务中心</h1></div>
       <div class="module-actions"><el-input v-model="keyword" placeholder="任务名称" clearable class="search-input" /><el-button @click="load">查询</el-button><el-button type="primary" @click="openCreate">新增任务</el-button></div>
     </section>
     <el-card class="table-card" shadow="never">

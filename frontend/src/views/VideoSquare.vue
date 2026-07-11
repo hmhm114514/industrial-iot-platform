@@ -4,7 +4,6 @@
       <div>
         <el-tag effect="dark" class="hero-tag">视频中心</el-tag>
         <h1>视频广场</h1>
-        <p>基于国标设备、拉流代理和视频告警接口汇聚通道状态，展示真实接入配置。</p>
       </div>
       <div class="module-actions">
         <el-segmented v-model="split" :options="[1, 4, 9]" />

@@ -4,7 +4,6 @@
       <div>
         <el-tag effect="dark" class="hero-tag">组态大屏</el-tag>
         <h1>可视化大屏</h1>
-        <p>读取已配置的大屏方案，结合设备、告警和遥测数据生成运行驾驶舱。</p>
       </div>
       <div class="module-actions">
         <el-select v-model="selectedId" placeholder="选择大屏" style="width: 220px" @change="selectScreen">

@@ -4,7 +4,6 @@
       <div>
         <el-tag effect="dark" class="hero-tag">智能辅助</el-tag>
         <h1>AI 智能体</h1>
-        <p>可填写大模型接入地址、模型和 API Key，围绕告警解释、巡检计划和设备状态分析生成运维建议。</p>
       </div>
       <div class="module-actions">
         <el-button :loading="loadingAgents" @click="loadAgents">刷新能力</el-button>

@@ -8,7 +8,6 @@ const numberField = (prop, label, extra = {}) => ({ prop, label, type: 'number',
 export const resourceConfigs = {
   productCategory: {
     title: '产品分类',
-    subtitle: '按业务场景组织产品模型，便于统一权限和统计。',
     accent: '分类',
     searchable: '分类名称 / 编码',
     columns: [
@@ -22,7 +21,6 @@ export const resourceConfigs = {
   },
   product: {
     title: '产品管理',
-    subtitle: '定义物模型、协议类型和接入方式，是设备接入的基础。',
     accent: '产品',
     searchable: '产品名称 / 编码',
     columns: [
@@ -46,7 +44,6 @@ export const resourceConfigs = {
   },
   deviceGroup: {
     title: '设备分组',
-    subtitle: '用厂区、产线或项目维度管理设备资产。',
     accent: '分组',
     searchable: '分组名称 / 位置',
     columns: [
@@ -61,7 +58,6 @@ export const resourceConfigs = {
   },
   device: {
     title: '设备管理',
-    subtitle: '维护设备档案、在线状态和最新遥测数据，可模拟上报温度。',
     accent: '设备',
     searchable: '设备名称 / 编码 / 分组',
     card: true,
@@ -91,7 +87,6 @@ export const resourceConfigs = {
   },
   networkService: {
     title: '网络服务',
-    subtitle: '展示 MQTT、HTTP 等接入服务运行态势和吞吐状态。',
     accent: '服务',
     columns: [
       { prop: 'name', label: '服务名称', minWidth: 180 },
@@ -106,7 +101,6 @@ export const resourceConfigs = {
   },
   script: {
     title: '解析脚本',
-    subtitle: '用脚本把原始报文转换为平台统一数据点。',
     accent: '脚本',
     columns: [
       { prop: 'name', label: '脚本名称', minWidth: 180 },
@@ -120,7 +114,6 @@ export const resourceConfigs = {
   },
   ruleAudit: {
     title: '规则审计',
-    subtitle: '记录规则执行结果，便于追踪告警产生过程。',
     readonly: true,
     columns: [
       { prop: 'ruleName', label: '规则名称', minWidth: 180 },
@@ -133,7 +126,6 @@ export const resourceConfigs = {
   },
   screenGroup: {
     title: '大屏分组',
-    subtitle: '从已配置大屏中聚合分组，避免分组与大屏数据混用。',
     accent: '分组',
     readonly: true,
     columns: [
@@ -146,7 +138,6 @@ export const resourceConfigs = {
   },
   screen: {
     title: '组态大屏',
-    subtitle: '以卡片预览方式管理可视化大屏，支持发布状态演示。',
     accent: '大屏',
     card: true,
     columns: [
@@ -161,7 +152,6 @@ export const resourceConfigs = {
   },
   gbDevice: {
     title: '国标设备',
-    subtitle: '管理 GB28181 视频设备和通道在线状态。',
     accent: '国标设备',
     columns: [
       { prop: 'name', label: '设备名称', minWidth: 180 },
@@ -174,7 +164,6 @@ export const resourceConfigs = {
   },
   streamProxy: {
     title: '拉流代理',
-    subtitle: '配置视频来源与播放方式转换代理。',
     accent: '代理',
     columns: [
       { prop: 'name', label: '代理名称', minWidth: 180 },
@@ -187,7 +176,6 @@ export const resourceConfigs = {
   },
   mediaService: {
     title: '流媒体服务',
-    subtitle: '观察流媒体节点健康度、CPU 和内存负载。',
     accent: '节点',
     columns: [
       { prop: 'name', label: '节点名称', minWidth: 180 },
@@ -201,7 +189,6 @@ export const resourceConfigs = {
   },
   videoRecord: {
     title: '录像回放',
-    subtitle: '按设备和时间段查看录像文件。',
     readonly: true,
     columns: [
       { prop: 'device', label: '设备', minWidth: 180 },
@@ -213,7 +200,6 @@ export const resourceConfigs = {
   },
   videoAlarm: {
     title: '视频告警',
-    subtitle: '展示越界、遮挡等智能视频告警。',
     readonly: true,
     columns: [
       { prop: 'device', label: '设备', minWidth: 180 },
@@ -226,7 +212,6 @@ export const resourceConfigs = {
   },
   serviceMonitor: {
     title: '服务监控',
-    subtitle: '监控平台业务服务可用性、延迟和吞吐。',
     readonly: true,
     columns: [
       { prop: 'name', label: '服务', minWidth: 160 },
@@ -240,7 +225,6 @@ export const resourceConfigs = {
   },
   taskLog: {
     title: '任务日志',
-    subtitle: '记录任务执行状态和输出信息。',
     readonly: true,
     columns: [
       { prop: 'taskName', label: '任务名称', minWidth: 180 },
@@ -252,7 +236,6 @@ export const resourceConfigs = {
   },
   user: {
     title: '用户管理',
-    subtitle: '维护系统用户、角色和启用状态。',
     accent: '用户',
     columns: [
       { prop: 'username', label: '账号', width: 130 },
@@ -271,7 +254,6 @@ export const resourceConfigs = {
   },
   role: {
     title: '角色管理',
-    subtitle: '用角色聚合菜单权限和数据权限。',
     accent: '角色',
     columns: [
       { prop: 'name', label: '角色名称', width: 150 },
@@ -283,7 +265,6 @@ export const resourceConfigs = {
   },
   firmware: {
     title: '固件管理',
-    subtitle: '管理设备固件包、版本状态和发布流程。',
     accent: '固件',
     columns: [
       { prop: 'name', label: '固件名称', minWidth: 160 },
@@ -297,7 +278,6 @@ export const resourceConfigs = {
   },
   operationLog: {
     title: '操作日志',
-    subtitle: '审计用户在平台中的关键操作。',
     readonly: true,
     columns: [
       { prop: 'user', label: '用户', width: 110 },
@@ -311,7 +291,6 @@ export const resourceConfigs = {
   },
   loginLog: {
     title: '登录日志',
-    subtitle: '记录登录来源、浏览器和认证结果。',
     readonly: true,
     columns: [
       { prop: 'username', label: '账号', width: 130 },
@@ -324,7 +303,6 @@ export const resourceConfigs = {
   },
   aiAgent: {
     title: 'AI智能体',
-    subtitle: '扩展模块：用智能助手解释告警、生成巡检建议。',
     readonly: true,
     columns: [
       { prop: 'name', label: '能力', minWidth: 160 },
@@ -335,7 +313,6 @@ export const resourceConfigs = {
   },
   devTool: {
     title: '开发工具',
-    subtitle: '扩展模块：联调工作台、代码生成和报文模拟。',
     readonly: true,
     columns: [
       { prop: 'name', label: '工具', minWidth: 160 },

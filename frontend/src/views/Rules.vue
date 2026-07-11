@@ -4,7 +4,6 @@
       <div>
         <el-tag effect="dark" class="hero-tag">规则引擎</el-tag>
         <h1>温度阈值规则设计</h1>
-        <p>配置设备温度阈值，模拟遥测上报时可由平台触发告警并写入审计。</p>
       </div>
       <div class="module-actions">
         <el-input v-model="keyword" placeholder="规则名称 / 指标" clearable class="search-input" />

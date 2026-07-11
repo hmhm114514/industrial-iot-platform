@@ -4,7 +4,6 @@
       <div>
         <el-tag effect="dark" class="hero-tag">数据中心</el-tag>
         <h1>历史数据</h1>
-        <p>查询设备遥测数据，验证模拟上报是否写入平台。</p>
       </div>
       <div class="module-actions">
         <el-select v-model="query.productGroup" clearable placeholder="产品分组" style="width: 160px">
