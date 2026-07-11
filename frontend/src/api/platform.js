@@ -99,13 +99,13 @@ const adaptItem = (kind, item = {}) => {
     case 'user':
       return { ...base, nickname: item.nickname || item.realName || item.username, role: item.role || item.roleName || '平台管理员' }
     case 'firmware':
-      return { ...base, product: item.product || item.targetProduct || 'PandaX工业网关', size: item.size || '12MB', status: item.upgradeStatus || status }
+      return { ...base, product: item.product || item.targetProduct || 'IN-IOT工业网关', size: item.size || '12MB', status: item.upgradeStatus || status }
     case 'operationLog':
       return { ...base, user: item.user || item.operator || 'admin', module: item.module || item.moduleName, result: item.result || '成功', time: timeText(item.createdAt) }
     case 'loginLog':
       return { ...base, browser: item.browser || 'Chrome', result: item.success === false ? '失败' : '成功', time: timeText(item.createdAt) }
     case 'aiAgent':
-      return { ...base, title: item.name, scenario: item.scenario || item.remark || '平台智能辅助', description: item.description || item.remark || '面向工业互联网运行场景提供建议', model: item.modelName || '平台默认模型', enabled: item.enabled ?? status !== 'DISABLED' }
+      return { ...base, title: item.name, scenario: item.scenario || item.remark || '平台智能辅助', description: item.description || item.remark || '面向工业物联网智能平台运行场景提供建议', model: item.modelName || '平台默认模型', enabled: item.enabled ?? status !== 'DISABLED' }
     default:
       return base
   }

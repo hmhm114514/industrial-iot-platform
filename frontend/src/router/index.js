@@ -57,7 +57,7 @@ const router = createRouter({
 })
 
 router.beforeEach((to) => {
-  document.title = to.meta?.title ? `${to.meta.title} - 工业互联网平台` : '工业互联网平台'
+  document.title = to.meta?.title ? `${to.meta.title} - 工业物联网智能平台` : '工业物联网智能平台'
   const token = localStorage.getItem('iot_token')
   if (!to.meta.public && !token) return '/login'
   if (to.path === '/login' && token) return '/dashboard'

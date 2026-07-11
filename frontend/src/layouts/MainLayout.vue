@@ -2,10 +2,10 @@
   <el-container class="shell">
     <el-aside :width="collapsed ? '72px' : '252px'" class="sidebar">
       <div class="brand" :class="{ collapsed }">
-        <div class="brand-mark">II</div>
+        <div class="brand-mark">IN</div>
         <div v-if="!collapsed">
-          <strong>工业物联平台</strong>
-          <span>Industrial IoT</span>
+          <strong>工业物联网智能平台</strong>
+          <span>IN-IOT</span>
         </div>
       </div>
       <el-scrollbar class="menu-scroll">

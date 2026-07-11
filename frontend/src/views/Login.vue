@@ -5,8 +5,8 @@
       <div class="orb orb-b" />
       <div class="grid-plane" />
       <div class="login-copy">
-        <el-tag effect="dark" class="login-tag">Industrial IoT Platform</el-tag>
-        <h1>工业互联网平台</h1>
+        <el-tag effect="dark" class="login-tag">IN-IOT</el-tag>
+        <h1>工业物联网智能平台</h1>
         <p>统一管理设备接入、数据采集、规则告警、任务调度与可视化运行态势。</p>
         <div class="login-metrics">
           <div><strong>设备</strong><span>统一接入</span></div>
@@ -17,10 +17,10 @@
     </div>
     <el-card class="login-card" shadow="always">
       <div class="login-card-head">
-        <div class="brand-mark">II</div>
+        <div class="brand-mark">IN</div>
         <div>
           <h2>用户登录</h2>
-          <p>请输入账号密码进入工业互联网平台。</p>
+          <p>请输入账号密码进入工业物联网智能平台。</p>
         </div>
       </div>
       <el-form :model="form" size="large" @keyup.enter="submit">
@@ -84,7 +84,7 @@ const submit = async () => {
     if (form.username === 'admin' && form.password === '123456') {
       localStorage.setItem('iot_token', `platform-local-token-${Date.now()}`)
       localStorage.setItem('iot_user', JSON.stringify({ username: 'admin', realName: '系统管理员', role: '超级管理员', roleName: '超级管理员' }))
-      ElMessage.warning('平台服务暂不可用，已进入本地运行模式')
+      ElMessage.warning('工业物联网智能平台服务暂不可用，已进入本地运行模式')
       router.replace('/dashboard')
     } else {
       ElMessage.error(error?.message || '登录失败')

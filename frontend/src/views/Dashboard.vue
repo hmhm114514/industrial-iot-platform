@@ -3,7 +3,7 @@
     <section class="hero-panel">
       <div>
         <el-tag effect="dark" class="hero-tag">实时态势</el-tag>
-        <h1>工业互联网平台控制台</h1>
+        <h1>工业物联网智能平台控制台</h1>
       </div>
       <div class="hero-actions">
         <el-button type="primary" size="large" @click="load">刷新数据</el-button>
