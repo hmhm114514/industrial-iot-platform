@@ -9,9 +9,6 @@ INSERT INTO rule(name, code, status, metric, operator, threshold, enabled, alarm
 INSERT INTO network_service(name, code, status, type, host, port, up_messages, down_messages, created_at, updated_at) VALUES ('MQTT接入服务','mqtt-server','RUNNING','MQTT','0.0.0.0',1883,1280,640,NOW(),NOW());
 INSERT INTO parse_script(name, code, status, language, script, created_at, updated_at) VALUES ('温湿度JSON解析脚本','parse-json-th','ENABLED','JavaScript','return {temperature: payload.temp, humidity: payload.hum};',NOW(),NOW());
 INSERT INTO dashboard_screen(name, code, status, group_name, published, config_json, created_at, updated_at) VALUES ('PandaX工厂运行总览','screen-factory','PUBLISHED','生产看板',TRUE,'{"theme":"dark"}',NOW(),NOW());
-INSERT INTO video_device(name, code, status, channel_no, stream_url, created_at, updated_at) VALUES ('车间球机01','CAM-001','ONLINE','CH-01','rtsp://demo.pandax.local/live/001',NOW(),NOW());
-INSERT INTO video_stream_proxy(name, code, status, video_device_id, play_url, protocol, created_at, updated_at) VALUES ('车间球机01-FLV代理','STREAM-001','ENABLED',1,'http://localhost:8080/mock/live/001.flv','FLV',NOW(),NOW());
-INSERT INTO video_alarm_task(name, code, status, video_device_id, algorithm, enabled, created_at, updated_at) VALUES ('安全帽识别任务','AI-HELMET-001','ENABLED',1,'helmet-detect',TRUE,NOW(),NOW());
 INSERT INTO task_job(name, code, status, cron, running, created_at, updated_at) VALUES ('设备在线状态巡检','TASK-ONLINE-CHECK','RUNNING','0 */5 * * * ?',TRUE,NOW(),NOW());
 INSERT INTO firmware(name, code, status, version, target_product, upgrade_status, file_url, created_at, updated_at) VALUES ('PandaX网关固件','FW-GW-1.0.0','ENABLED','v1.0.0','PandaX边缘网关','READY','/files/fw-gw-1.0.0.bin',NOW(),NOW());
 INSERT INTO telemetry_data(device_id, device_name, temperature, humidity, pressure, payload, report_time) VALUES (1,'注塑机温度传感器01',88.6,61.0,101.2,'{"temperature":88.6,"humidity":61.0,"pressure":101.2}',NOW());
