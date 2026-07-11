@@ -2,7 +2,7 @@ const statusColumn = { prop: 'status', label: '状态', type: 'status', width: 1
 const enabledColumn = { prop: 'enabled', label: '启停', type: 'switch', width: 100 }
 
 const textField = (prop, label, extra = {}) => ({ prop, label, type: 'text', ...extra })
-const selectField = (prop, label, options, extra = {}) => ({ prop, label, type: 'select', options, ...extra })
+const selectField = (prop, label, options = [], extra = {}) => ({ prop, label, type: 'select', options, ...extra })
 const numberField = (prop, label, extra = {}) => ({ prop, label, type: 'number', ...extra })
 
 export const resourceConfigs = {
@@ -18,7 +18,7 @@ export const resourceConfigs = {
       statusColumn,
       { prop: 'createdAt', label: '创建时间', width: 180 }
     ],
-    fields: [textField('name', '分类名称'), textField('code', '分类编码'), textField('description', '说明')]
+    fields: [textField('name', '分类名称', { required: true }), textField('code', '分类编码', { required: true }), textField('description', '说明')]
   },
   product: {
     title: '产品管理',
@@ -29,16 +29,18 @@ export const resourceConfigs = {
       { prop: 'name', label: '产品名称', minWidth: 190 },
       { prop: 'code', label: '产品编码', width: 140 },
       { prop: 'category', label: '所属分类', width: 130 },
+      { prop: 'ruleChain', label: '规则链', minWidth: 170 },
       { prop: 'protocol', label: '接入协议', width: 110, type: 'tag' },
       { prop: 'deviceCount', label: '设备数', width: 90 },
       statusColumn,
       { prop: 'createdAt', label: '创建时间', width: 180 }
     ],
     fields: [
-      textField('name', '产品名称'),
-      textField('code', '产品编码'),
-      textField('category', '所属分类'),
-      selectField('protocol', '接入协议', ['MQTT', 'HTTP', 'TCP', 'CoAP', 'GB28181']),
+      textField('name', '产品名称', { required: true }),
+      textField('code', '产品编码', { required: true }),
+      selectField('categoryId', '所属分类', [], { required: true, source: 'productCategory', optionLabel: 'name', optionValue: 'id' }),
+      selectField('ruleIds', '规则链', [], { required: true, multiple: true, source: 'rule', optionLabel: 'name', optionValue: 'id' }),
+      selectField('protocol', '接入协议', ['MQTT', 'HTTP', 'TCP', 'CoAP', 'GB28181'], { required: true }),
       numberField('deviceCount', '设备数')
     ]
   },
@@ -55,7 +57,7 @@ export const resourceConfigs = {
       { prop: 'deviceCount', label: '设备数', width: 90 },
       statusColumn
     ],
-    fields: [textField('name', '分组名称'), textField('code', '编码'), textField('location', '位置'), textField('owner', '负责人'), numberField('deviceCount', '设备数')]
+    fields: [textField('name', '分组名称', { required: true }), textField('code', '编码', { required: true }), textField('location', '位置', { required: true }), textField('owner', '负责人', { required: true }), numberField('deviceCount', '设备数', { required: true })]
   },
   device: {
     title: '设备管理',
@@ -76,14 +78,15 @@ export const resourceConfigs = {
       { prop: 'lastSeen', label: '最后通信', width: 180 }
     ],
     fields: [
-      textField('name', '设备名称'),
-      textField('code', '设备编码'),
-      textField('product', '所属产品'),
-      textField('group', '所属分组'),
-      numberField('temperature', '当前温度'),
-      numberField('latitude', '纬度', { min: -90, max: 90 }),
-      numberField('longitude', '经度', { min: -180, max: 180 }),
-      textField('location', '位置')
+      textField('name', '设备名称', { required: true }),
+      textField('code', '设备编码', { required: true }),
+      selectField('productId', '所属产品', [], { required: true, source: 'product', optionLabel: 'name', optionValue: 'id' }),
+      selectField('groupId', '所属分组', [], { required: true, source: 'deviceGroup', optionLabel: 'name', optionValue: 'id' }),
+      textField('deviceKey', '设备 Key', { required: true }),
+      numberField('temperature', '当前温度', { required: true }),
+      numberField('latitude', '纬度', { required: true, min: -90, max: 90 }),
+      numberField('longitude', '经度', { required: true, min: -180, max: 180 }),
+      textField('location', '位置', { required: true })
     ]
   },
   networkService: {

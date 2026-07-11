@@ -35,6 +35,17 @@ const timeText = (value) => value ? String(value).replace('T', ' ').slice(0, 19)
 const cnLevel = (value) => ({ HIGH: '高', MEDIUM: '中', LOW: '低', INFO: '低', high: '高', medium: '中', low: '低' }[value] || value || '中')
 const alarmStatus = (value) => ['CLOSED', 'closed', '已处理'].includes(value) ? '已处理' : '未处理'
 const shortDate = (value) => String(value || '').slice(5) || value
+const alarmRuleName = (item) => item.ruleName || String(item.content || '').match(/触发规则[:：]\s*(.+)$/)?.[1] || ''
+export const telemetryMetrics = [
+  { label: '温度 temperature', value: 'temperature', unit: '℃' },
+  { label: '湿度 humidity', value: 'humidity', unit: '%' },
+  { label: '压力 pressure', value: 'pressure', unit: 'kPa' },
+  { label: '振动 vibration', value: 'vibration', unit: 'mm/s' },
+  { label: '电流 current', value: 'current', unit: 'A' },
+  { label: '电压 voltage', value: 'voltage', unit: 'V' },
+  { label: '功率 power', value: 'power', unit: 'kW' },
+  { label: '转速 speed', value: 'speed', unit: 'rpm' }
+]
 
 const normalizeSeries = (input, labels = []) => {
   if (Array.isArray(input)) {
@@ -119,14 +130,18 @@ const adaptList = (kind, payload) => {
     ]
   }
   if (kind === 'historicalData' && Array.isArray(payload)) {
-    return payload.flatMap((item) => [
-      item.temperature !== null && item.temperature !== undefined ? { id: `${item.id}-temperature`, deviceName: item.deviceName, metric: 'temperature', value: item.temperature, unit: '℃', time: timeText(item.reportTime) } : null,
-      item.humidity !== null && item.humidity !== undefined ? { id: `${item.id}-humidity`, deviceName: item.deviceName, metric: 'humidity', value: item.humidity, unit: '%', time: timeText(item.reportTime) } : null,
-      item.pressure !== null && item.pressure !== undefined ? { id: `${item.id}-pressure`, deviceName: item.deviceName, metric: 'pressure', value: item.pressure, unit: 'kPa', time: timeText(item.reportTime) } : null
-    ].filter(Boolean))
+    return payload.map((item) => {
+      let body = {}
+      try { body = item.payload ? JSON.parse(item.payload) : {} } catch (error) { body = {} }
+      const metrics = telemetryMetrics.map((metric) => {
+        const value = item[metric.value] ?? body[metric.value]
+        return value !== null && value !== undefined ? { metric: metric.value, label: metric.label, value, unit: metric.unit } : null
+      }).filter(Boolean)
+      return { ...item, metrics, metricValues: Object.fromEntries(metrics.map((metric) => [metric.metric, metric.value])), time: timeText(item.reportTime) }
+    })
   }
   if (kind === 'historicalAlarm' && Array.isArray(payload)) {
-    return payload.map((item) => ({ ...adaptItem(kind, item), title: item.title || item.name, value: item.value || item.content, status: alarmStatus(item.status), level: cnLevel(item.level), time: timeText(item.createdAt) }))
+    return payload.map((item) => ({ ...adaptItem(kind, item), title: item.title || item.name, ruleName: alarmRuleName(item), value: item.value || item.content, status: alarmStatus(item.status), level: cnLevel(item.level), time: timeText(item.createdAt) }))
   }
   return Array.isArray(payload) ? payload.map((item) => adaptItem(kind, item)) : payload
 }

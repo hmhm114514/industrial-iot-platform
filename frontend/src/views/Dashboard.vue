@@ -135,12 +135,15 @@ const load = async () => {
 }
 
 const resize = () => charts.forEach((chart) => chart.resize())
+const handleRealtime = (event) => { if (event.detail?.type === 'telemetry') load() }
 onMounted(() => {
   load()
   window.addEventListener('resize', resize)
+  window.addEventListener('iot-realtime', handleRealtime)
 })
 onBeforeUnmount(() => {
   window.removeEventListener('resize', resize)
+  window.removeEventListener('iot-realtime', handleRealtime)
   charts.forEach((chart) => chart.dispose())
 })
 </script>

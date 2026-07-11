@@ -6,7 +6,7 @@ import jakarta.servlet.http.*;import org.springframework.beans.factory.annotatio
 public class SecurityConfig implements WebMvcConfigurer {
     @Value("${app.token:panda-iot-demo-token}") String token;
     @Override public void addCorsMappings(CorsRegistry registry) { registry.addMapping("/**").allowedOriginPatterns("*").allowedMethods("GET","POST","PUT","DELETE","PATCH","OPTIONS").allowedHeaders("*").allowCredentials(false).maxAge(3600); }
-    @Override public void addInterceptors(InterceptorRegistry registry) { registry.addInterceptor(new TokenInterceptor(token)).addPathPatterns("/api/**").excludePathPatterns("/api/auth/login"); }
+    @Override public void addInterceptors(InterceptorRegistry registry) { registry.addInterceptor(new TokenInterceptor(token)).addPathPatterns("/api/**").excludePathPatterns("/api/auth/login","/api/telemetry/report"); }
 }
 class TokenInterceptor implements org.springframework.web.servlet.HandlerInterceptor {
     private final String token; TokenInterceptor(String token) { this.token = token; }

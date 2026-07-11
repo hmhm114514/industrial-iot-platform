@@ -17,7 +17,7 @@ public class TokenGatewayFilter implements GlobalFilter, Ordered {
     @Value("${app.token:panda-iot-demo-token}") String token;
     @Override public Mono<Void> filter(ServerWebExchange exchange, GatewayFilterChain chain) {
         String path = exchange.getRequest().getURI().getPath();
-        if ("OPTIONS".equalsIgnoreCase(exchange.getRequest().getMethod().name()) || "/api/auth/login".equals(path) || !path.startsWith("/api/")) return chain.filter(exchange);
+        if ("OPTIONS".equalsIgnoreCase(exchange.getRequest().getMethod().name()) || "/api/auth/login".equals(path) || "/api/telemetry/report".equals(path) || !path.startsWith("/api/")) return chain.filter(exchange);
         String auth = exchange.getRequest().getHeaders().getFirst(HttpHeaders.AUTHORIZATION);
         if (("Bearer " + token).equals(auth)) return chain.filter(exchange);
         exchange.getResponse().setStatusCode(HttpStatus.UNAUTHORIZED);

@@ -89,8 +89,8 @@ export const fallbackRows = {
     { id: 3, deviceName: 'B区温度传感器-03', metric: 'temperature', value: 42.1, unit: '℃', time: '2026-07-03 10:02:11' }
   ],
   historicalAlarm: [
-    { id: 1, title: 'B区温度过高', deviceName: 'B区温度传感器-03', level: '高', status: '未处理', value: '42.1℃', time: '2026-07-03 10:02:11', handler: '-' },
-    { id: 2, title: '网关离线', deviceName: '北门边缘网关', level: '中', status: '已处理', value: '离线 20 分钟', time: commonTime, handler: 'admin' }
+    { id: 1, title: 'B区温度过高', deviceName: 'B区温度传感器-03', level: '高', ruleName: '温度超 38℃ 告警', status: '未处理', value: '42.1℃', time: '2026-07-03 10:02:11', handler: '-' },
+    { id: 2, title: '网关离线', deviceName: '北门边缘网关', level: '中', ruleName: '网关离线告警', status: '已处理', value: '离线 20 分钟', time: commonTime, handler: 'admin' }
   ],
   serviceMonitor: [
     { id: 1, name: '认证服务', monitorObject: '用户认证服务', latency: '23ms', qps: 32, status: 'healthy', enabled: true },

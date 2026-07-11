@@ -252,6 +252,23 @@ npm run build
 10. 返回仪表板，观察告警和消息统计变化。
 11. 进入“系统设置 / 操作日志”和“登录日志”，查看审计记录。
 
+如需从平台外部模拟一台设备主动接入并完成“数据采集、数据上传、规则判断、告警生成、告警处置”全流程，可执行：
+
+```powershell
+cd D:\作业\工业互联网平台开发实践\industrial-iot-platform
+powershell -ExecutionPolicy Bypass -File .\scripts\simulated-device-flow.ps1 -CloseAlarm
+```
+
+详细步骤见 `docs/模拟设备接入全流程.md`。
+
+如需使用 MQTTX 接入，先启动本地 MQTT Broker：
+
+```powershell
+docker compose -f .\docker-compose.mqtt.yml up -d
+```
+
+然后在 MQTTX 中连接 `localhost:1883`，向 `/iot/key-th-001/telemetry` 发布遥测 JSON。详细步骤见 `docs/MQTTX接入说明.md`。
+
 ## 9. 关键后端 API
 
 | 功能 | API |
@@ -265,6 +282,8 @@ npm run build
 | 设备分组 | `/api/device-groups` |
 | 设备管理 | `/api/devices` |
 | 模拟遥测上报 | `POST /api/telemetry/simulate` |
+| 外部设备遥测上报 | `POST /api/telemetry/report` |
+| MQTT 遥测上报 | Topic `/iot/{deviceKey}/telemetry` |
 | 历史遥测 | `GET /api/telemetry` |
 | 告警管理 | `/api/alarms` |
 | 告警处置 | `POST /api/alarms/{id}/handle` |
@@ -324,6 +343,8 @@ npm run build
 | `docs/API清单.md` | 核心 REST API 列表 |
 | `docs/数据库设计.md` | 主要表结构、关系和 H2/MySQL 策略 |
 | `docs/测试用例.md` | 功能、接口、异常、构建和验证测试用例 |
+| `docs/模拟设备接入全流程.md` | 外部模拟设备接入、数据上传和告警闭环 |
+| `docs/MQTTX接入说明.md` | MQTTX 连接、发布 Topic 和数据验证 |
 
 ## 12. 常见问题
 

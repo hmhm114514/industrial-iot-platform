@@ -3,4 +3,4 @@ package com.practice.core.entity;
 import com.practice.common.BaseEntity;
 
     @Entity
-    public class Rule extends BaseEntity { public String metric = "temperature"; public String operator = ">"; public Double threshold = 80.0; public Boolean enabled = true; public String alarmLevel = "HIGH"; }
+    public class Rule extends BaseEntity { public String metric = "temperature"; public String operator = ">"; public Double threshold = 80.0; public Boolean enabled = true; public String alarmLevel = "HIGH"; public String action; }

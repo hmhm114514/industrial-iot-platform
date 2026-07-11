@@ -92,6 +92,8 @@ Authorization: Bearer panda-iot-demo-token
 - `GET/POST/PUT/DELETE /api/device-groups` 设备分组 CRUD
 - `GET/POST/PUT/DELETE /api/devices` 设备 CRUD
 - `POST /api/telemetry/simulate` 模拟上报遥测，示例：`{"deviceId":1,"temperature":86.2,"humidity":45,"pressure":101.3}`
+- `POST /api/telemetry/report` 外部设备遥测上报，示例：`{"deviceKey":"key-th-001","temperature":86.2,"humidity":45,"pressure":101.3}`
+- MQTT Topic `/iot/{deviceKey}/telemetry`，示例 Topic：`/iot/key-th-001/telemetry`
 - `GET /api/telemetry` 最近遥测数据
 - `GET/POST/PUT/DELETE /api/rules` 温度/指标阈值规则
 - `GET /api/rule-audits` 规则审计
@@ -130,3 +132,55 @@ Authorization: Bearer panda-iot-demo-token
 3. 调用 `POST /api/telemetry/simulate` 上报温度。
 4. 当温度超过启用规则 `温度超过80℃自动告警` 的阈值时，自动生成告警与规则审计。
 5. 通过仪表板、历史数据、告警列表查看统计联动，再调用告警处置接口关闭告警。
+
+也可以使用外部模拟设备脚本一次性完成全流程：
+
+```powershell
+cd ..\
+powershell -ExecutionPolicy Bypass -File .\scripts\simulated-device-flow.ps1 -CloseAlarm
+```
+
+该脚本会登录平台、读取设备、通过 `/api/telemetry/report` 上传正常遥测和高温遥测、查询历史数据和告警，并可自动处置最新 OPEN 告警。详细说明见 `docs/模拟设备接入全流程.md`。
+
+## MQTTX 接入
+
+项目提供本地 Mosquitto 配置，便于 MQTTX 连接测试。先在项目根目录启动 Broker：
+
+```powershell
+cd ..
+docker compose -f .\docker-compose.mqtt.yml up -d
+```
+
+再启动后端服务。`platform-core-service` 会订阅：
+
+```text
+/iot/+/telemetry
+/iot/telemetry
+```
+
+MQTTX 连接参数：
+
+```text
+Host: localhost
+Port: 1883
+Username: 留空
+Password: 留空
+```
+
+推荐发布 Topic：
+
+```text
+/iot/key-th-001/telemetry
+```
+
+Payload：
+
+```json
+{
+  "temperature": 91.2,
+  "humidity": 51,
+  "pressure": 102.4
+}
+```
+
+发布后会进入与 HTTP 上报相同的遥测、规则审计和告警链路。详细说明见 `docs/MQTTX接入说明.md`。

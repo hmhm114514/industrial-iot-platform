@@ -56,6 +56,26 @@
             @change="applyTheme"
           />
           <el-tag effect="dark" type="success" round>平台服务</el-tag>
+          <el-popover placement="bottom-end" width="320" trigger="click">
+            <template #reference>
+              <el-badge :value="unreadAlarmCount" :hidden="!unreadAlarmCount" :max="99">
+                <el-button class="message-button" :icon="Icons.Bell" circle />
+              </el-badge>
+            </template>
+            <div class="message-popover">
+              <div class="message-head">
+                <strong>告警消息</strong>
+                <el-button v-if="unreadAlarmCount" link type="primary" @click="markAlarmsRead">全部已读</el-button>
+              </div>
+              <div v-if="highAlarms.length" class="message-list">
+                <button v-for="alarm in highAlarms" :key="alarm.id" class="message-item" @click="openAlarmPage">
+                  <span>{{ alarm.title || alarm.name || '高等级告警' }}</span>
+                  <small>{{ alarm.deviceName || '未知设备' }} · {{ alarm.time || alarm.createdAt || '-' }}</small>
+                </button>
+              </div>
+              <el-empty v-else description="暂无高等级告警" :image-size="72" />
+            </div>
+          </el-popover>
           <el-dropdown @command="handleCommand">
             <div class="user-chip">
               <el-avatar :size="32">{{ avatarText }}</el-avatar>
@@ -84,12 +104,14 @@
 </template>
 
 <script setup>
-import { computed, onMounted, ref } from 'vue'
+import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import * as Icons from '@element-plus/icons-vue'
 import { ArrowDown } from '@element-plus/icons-vue'
 import { ElMessage } from 'element-plus'
 import { filterMenusByRole, findMenuTrail } from '../config/menu'
+import { resourceApi } from '../api/platform'
+import { closeRealtime, connectRealtime } from '../api/realtime'
 
 const route = useRoute()
 const router = useRouter()
@@ -100,6 +122,10 @@ const readUser = () => {
   try { return JSON.parse(localStorage.getItem('iot_user') || '{}') } catch { return {} }
 }
 const userInfo = ref(readUser())
+const highAlarms = ref([])
+const readAlarmIds = ref(JSON.parse(localStorage.getItem('iot_read_alarm_ids') || '[]'))
+const notifiedAlarmIds = ref(JSON.parse(localStorage.getItem('iot_notified_alarm_ids') || '[]'))
+let alarmTimer
 
 const visibleMenus = computed(() => filterMenusByRole(undefined, userInfo.value))
 const displayName = computed(() => userInfo.value.realName || userInfo.value.username || '未登录用户')
@@ -107,6 +133,7 @@ const userRole = computed(() => userInfo.value.roleName || userInfo.value.role |
 const accountLabel = computed(() => `${displayName.value}${userInfo.value.username ? ` / ${userInfo.value.username}` : ''} · ${userRole.value}`)
 const avatarText = computed(() => (displayName.value || 'U').slice(0, 1).toUpperCase())
 const trail = computed(() => findMenuTrail(route.path, visibleMenus.value))
+const unreadAlarmCount = computed(() => highAlarms.value.filter((alarm) => !readAlarmIds.value.includes(alarm.id)).length)
 
 const applyTheme = () => {
   document.body.classList.toggle('dark', dark.value)
@@ -126,5 +153,65 @@ const handleCommand = (command) => {
   }
 }
 
-onMounted(applyTheme)
+const persistAlarmState = () => {
+  localStorage.setItem('iot_read_alarm_ids', JSON.stringify(readAlarmIds.value))
+  localStorage.setItem('iot_notified_alarm_ids', JSON.stringify(notifiedAlarmIds.value))
+}
+
+const isHighAlarm = (alarm) => {
+  const level = String(alarm.level || alarm.alarmLevel || '').toUpperCase()
+  const status = String(alarm.status || '').toUpperCase()
+  return ['高', 'HIGH'].includes(level) && !['已处理', 'CLOSED', 'CLOSE'].includes(status)
+}
+
+const loadAlarmMessages = async () => {
+  try {
+    const rows = await resourceApi.list('historicalAlarm')
+    highAlarms.value = rows.filter(isHighAlarm).sort((a, b) => new Date(b.createdAt || b.time || 0) - new Date(a.createdAt || a.time || 0))
+    highAlarms.value
+      .filter((alarm) => !notifiedAlarmIds.value.includes(alarm.id))
+      .forEach((alarm) => {
+        ElMessage({
+          message: `高等级告警：${alarm.deviceName || '未知设备'} - ${alarm.title || alarm.name || alarm.value || '触发高等级告警'}`,
+          type: 'error',
+          showClose: true,
+          grouping: true,
+          duration: 10000
+        })
+        notifiedAlarmIds.value.push(alarm.id)
+      })
+    readAlarmIds.value = readAlarmIds.value.filter((id) => highAlarms.value.some((alarm) => alarm.id === id))
+    notifiedAlarmIds.value = notifiedAlarmIds.value.filter((id) => highAlarms.value.some((alarm) => alarm.id === id))
+    persistAlarmState()
+  } catch {
+    highAlarms.value = []
+  }
+}
+
+const markAlarmsRead = () => {
+  readAlarmIds.value = highAlarms.value.map((alarm) => alarm.id)
+  persistAlarmState()
+}
+
+const openAlarmPage = () => {
+  markAlarmsRead()
+  router.push('/data/alarms')
+}
+
+const handleRealtime = (event) => {
+  if (['telemetry', 'alarm'].includes(event.detail?.type)) loadAlarmMessages()
+}
+
+onMounted(() => {
+  applyTheme()
+  connectRealtime()
+  window.addEventListener('iot-realtime', handleRealtime)
+  loadAlarmMessages()
+  alarmTimer = window.setInterval(loadAlarmMessages, 10000)
+})
+onBeforeUnmount(() => {
+  window.removeEventListener('iot-realtime', handleRealtime)
+  window.clearInterval(alarmTimer)
+  closeRealtime()
+})
 </script>

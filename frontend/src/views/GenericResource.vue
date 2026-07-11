@@ -30,6 +30,7 @@
             <span v-if="row.lastSeen">{{ row.lastSeen }}</span>
           </div>
           <div class="resource-actions" v-if="!cfg.readonly">
+            <el-button v-if="kind === 'device'" text type="primary" @click="openView(row)">查看</el-button>
             <el-button text type="primary" @click="openEdit(row)">编辑</el-button>
             <el-button v-if="kind === 'device'" text type="success" @click="openSimulate(row)">模拟上报</el-button>
             <el-button text type="danger" @click="removeRow(row)">删除</el-button>
@@ -50,6 +51,7 @@
         </el-table-column>
         <el-table-column v-if="!cfg.readonly" label="操作" fixed="right" width="230">
           <template #default="{ row }">
+            <el-button v-if="kind === 'device'" link type="primary" @click="openView(row)">查看</el-button>
             <el-button link type="primary" @click="openEdit(row)">编辑</el-button>
             <el-button v-if="kind === 'device'" link type="success" @click="openSimulate(row)">模拟上报</el-button>
             <el-button link type="danger" @click="removeRow(row)">删除</el-button>
@@ -59,10 +61,10 @@
     </el-card>
 
     <el-dialog v-model="dialogVisible" :title="dialogTitle" width="560px" destroy-on-close>
-      <el-form :model="form" label-width="96px">
-        <el-form-item v-for="field in cfg.fields" :key="field.prop" :label="field.label">
-          <el-select v-if="field.type === 'select'" v-model="form[field.prop]" class="full" placeholder="请选择">
-            <el-option v-for="item in field.options" :key="item" :label="item" :value="item" />
+      <el-form ref="formRef" :model="form" :rules="formRules" label-width="96px">
+        <el-form-item v-for="field in cfg.fields" :key="field.prop" :label="field.label" :prop="field.prop">
+          <el-select v-if="field.type === 'select'" v-model="form[field.prop]" class="full" placeholder="请选择" :multiple="field.multiple" collapse-tags collapse-tags-tooltip>
+            <el-option v-for="item in fieldOptions(field)" :key="optionValue(item, field)" :label="optionLabel(item, field)" :value="optionValue(item, field)" />
           </el-select>
           <el-input-number v-else-if="field.type === 'number'" v-model="form[field.prop]" class="full" :min="field.min ?? 0" :max="field.max" />
           <el-input v-else v-model="form[field.prop]" :type="field.type === 'password' ? 'password' : 'text'" :show-password="field.type === 'password'" :placeholder="field.placeholder || `请输入${field.label}`" />
@@ -72,6 +74,20 @@
         <el-button @click="dialogVisible = false">取消</el-button>
         <el-button type="primary" :loading="saving" @click="saveRow">保存</el-button>
       </template>
+    </el-dialog>
+
+    <el-dialog v-model="detailVisible" :title="detailTitle" width="760px" destroy-on-close>
+      <div class="device-detail">
+        <section v-for="section in detailSections" :key="section.title" class="device-detail-section">
+          <h3>{{ section.title }}</h3>
+          <el-descriptions :column="2" border>
+            <el-descriptions-item v-for="item in section.items" :key="item.label" :label="item.label">
+              <StatusTag v-if="item.type === 'status'" :value="item.value" />
+              <span v-else>{{ item.value || '-' }}</span>
+            </el-descriptions-item>
+          </el-descriptions>
+        </section>
+      </div>
     </el-dialog>
 
     <el-dialog v-model="simulateVisible" title="模拟设备遥测上报" width="520px" destroy-on-close>
@@ -120,27 +136,127 @@ const route = useRoute()
 const kind = computed(() => route.meta.kind)
 const cfg = computed(() => resourceConfigs[kind.value] || resourceConfigs.devTool)
 const rows = ref([])
+const optionSources = ref({})
 const keyword = ref('')
 const loading = ref(false)
 const saving = ref(false)
 const dialogVisible = ref(false)
 const simulateVisible = ref(false)
+const detailVisible = ref(false)
 const editingId = ref(null)
+const currentDetail = ref(null)
+const formRef = ref(null)
 const form = reactive({})
 const simulateForm = reactive({ deviceCode: '', deviceName: '', temperature: 36, humidity: 55 })
 
 const dialogTitle = computed(() => `${editingId.value ? '编辑' : '新增'}${cfg.value.accent || cfg.value.title}`)
+const detailTitle = computed(() => currentDetail.value ? `设备详情 - ${currentDetail.value.name || currentDetail.value.code}` : '设备详情')
 const filteredRows = computed(() => {
   const key = keyword.value.trim().toLowerCase()
   if (!key) return rows.value
   return rows.value.filter((row) => JSON.stringify(row).toLowerCase().includes(key))
 })
+const formRules = computed(() => Object.fromEntries(cfg.value.fields.filter((field) => field.required).map((field) => [field.prop, [{ required: true, message: `请选择或输入${field.label}`, trigger: field.type === 'select' ? 'change' : 'blur' }]])))
 
 const fallback = () => clone(fallbackRows[kind.value] || fallbackExtra[kind.value] || [])
+const optionLabel = (item, field) => item && typeof item === 'object' ? item[field.optionLabel || 'label'] ?? item.name ?? item.label : item
+const optionValue = (item, field) => item && typeof item === 'object' ? item[field.optionValue || 'value'] ?? item.id ?? item.value : item
+const fieldOptions = (field) => field.source ? optionSources.value[field.source] || [] : field.options || []
+const valueText = (value) => value === null || value === undefined || value === '' ? '-' : String(value)
+const linkStatus = (row = {}) => {
+  const raw = String(row.linkStatus || row.status || '').toLowerCase()
+  if (row.online === true || raw === 'online') return '在线'
+  if (row.online === false || raw === 'offline') return '离线'
+  if (raw === 'inactive') return '未激活'
+  return row.linkStatus || (row.online === undefined ? '-' : '离线')
+}
+const coordinateText = (row = {}) => {
+  if (row.latitude !== undefined && row.longitude !== undefined) return `${row.latitude}, ${row.longitude}`
+  return row.location || '-'
+}
+const detailSections = computed(() => {
+  const row = currentDetail.value || {}
+  return [
+    {
+      title: '基础信息',
+      items: [
+        { label: '设备名称', value: row.name },
+        { label: '设备编码', value: row.code },
+        { label: '设备别名', value: row.alias },
+        { label: '设备类型', value: row.deviceType || '直连设备' },
+        { label: '启用状态', value: row.status, type: 'status' }
+      ]
+    },
+    {
+      title: '所属信息',
+      items: [
+        { label: '所属产品', value: row.product },
+        { label: '所属分组', value: row.group },
+        { label: '接入协议', value: row.protocol || row.productProtocol },
+        { label: '安装位置', value: row.location }
+      ]
+    },
+    {
+      title: '连接信息',
+      items: [
+        { label: '连接状态', value: linkStatus(row), type: 'status' },
+        { label: '最后通信', value: row.lastSeen || row.lastTime || row.lastOnlineAt },
+        { label: '当前温度', value: row.temperature === undefined ? '-' : `${row.temperature}℃` },
+        { label: '经纬度', value: coordinateText(row) }
+      ]
+    },
+    {
+      title: '认证与扩展',
+      items: [
+        { label: '设备 Key', value: row.deviceKey || row.token },
+        { label: '父设备', value: row.parentId },
+        { label: '固件版本', value: row.otaVersion },
+        { label: '说明', value: row.description || row.remark },
+        { label: '创建时间', value: row.createdAt },
+        { label: '更新时间', value: row.updatedAt }
+      ]
+    }
+  ].map((section) => ({ ...section, items: section.items.map((item) => ({ ...item, value: valueText(item.value) })) }))
+})
 
+const loadOptions = async () => {
+  const sources = [...new Set(cfg.value.fields.map((field) => field.source).filter(Boolean))]
+  if (!sources.length) return
+  const entries = await Promise.all(sources.map(async (source) => {
+    try {
+      return [source, await resourceApi.list(source)]
+    } catch (error) {
+      return [source, []]
+    }
+  }))
+  optionSources.value = { ...optionSources.value, ...Object.fromEntries(entries) }
+}
+
+const withOptionLabels = (items) => {
+  const categories = optionSources.value.productCategory || []
+  const rules = optionSources.value.rule || []
+  const products = optionSources.value.product || []
+  const groups = optionSources.value.deviceGroup || []
+  if (kind.value === 'device') {
+    return items.map((item) => ({
+      ...item,
+      product: products.find((product) => String(product.id) === String(item.productId))?.name || item.product,
+      productProtocol: products.find((product) => String(product.id) === String(item.productId))?.protocol,
+      group: groups.find((group) => String(group.id) === String(item.groupId))?.name || item.group
+    }))
+  }
+  if (kind.value !== 'product') return items
+  return items.map((item) => ({
+    ...item,
+    category: categories.find((category) => category.id === item.categoryId)?.name || item.category,
+    ruleChain: parseMultiValue(item.ruleIds || item.ruleId).map((id) => rules.find((rule) => String(rule.id) === String(id))?.name).filter(Boolean).join('，') || item.ruleChain || '-'
+  }))
+}
+
+const parseMultiValue = (value) => Array.isArray(value) ? value : String(value || '').split(',').map((item) => item.trim()).filter(Boolean).map((item) => Number.isNaN(Number(item)) ? item : Number(item))
 const resetForm = (row = {}) => {
   Object.keys(form).forEach((key) => delete form[key])
-  cfg.value.fields.forEach((field) => { form[field.prop] = field.prop === 'password' ? '' : row[field.prop] ?? (field.type === 'number' ? 0 : '') })
+  cfg.value.fields.forEach((field) => { form[field.prop] = field.multiple ? parseMultiValue(row[field.prop] || row.ruleId) : field.prop === 'password' ? '' : row[field.prop] ?? (field.type === 'number' ? 0 : '') })
   form.status = row.status || 'enabled'
   form.enabled = row.enabled ?? true
 }
@@ -148,11 +264,12 @@ const resetForm = (row = {}) => {
 const load = async () => {
   loading.value = true
   try {
+    await loadOptions()
     const payload = await resourceApi.list(kind.value, { keyword: keyword.value })
-    rows.value = normalizeList(payload)
+    rows.value = withOptionLabels(normalizeList(payload))
   } catch (error) {
     quietError(error, '数据服务暂不可用，当前为演示数据')
-    rows.value = fallback()
+    rows.value = withOptionLabels(fallback())
   } finally {
     loading.value = false
   }
@@ -170,9 +287,18 @@ const openEdit = (row) => {
   dialogVisible.value = true
 }
 
+const openView = (row) => {
+  currentDetail.value = row
+  detailVisible.value = true
+}
+
 const saveRow = async () => {
+  const valid = await formRef.value?.validate().catch(() => false)
+  if (!valid) return
   saving.value = true
   const payload = { ...form }
+  cfg.value.fields.filter((field) => field.multiple).forEach((field) => { payload[field.prop] = (payload[field.prop] || []).join(',') })
+  if (kind.value === 'product' && payload.ruleIds) payload.ruleId = Number(String(payload.ruleIds).split(',')[0])
   if (kind.value === 'user' && editingId.value && !payload.password) delete payload.password
   try {
     if (editingId.value) await resourceApi.update(kind.value, editingId.value, payload)

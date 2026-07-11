@@ -22,6 +22,14 @@ spring:
         dialect: org.hibernate.dialect.H2Dialect
 app:
   token: panda-iot-demo-token
+  mqtt:
+    enabled: ${APP_MQTT_ENABLED:true}
+    broker-url: ${APP_MQTT_BROKER_URL:tcp://localhost:1883}
+    client-id: ${APP_MQTT_CLIENT_ID:pandax-platform-core}
+    topic: ${APP_MQTT_TOPIC:/iot/+/telemetry}
+    fallback-topic: ${APP_MQTT_FALLBACK_TOPIC:/iot/telemetry}
+    username: ${APP_MQTT_USERNAME:}
+    password: ${APP_MQTT_PASSWORD:}
   ai:
     enabled: ${APP_AI_ENABLED:true}
     base-url: ${MAAS_BASE_URL:https://maas.icompify.com:32788/v1}
