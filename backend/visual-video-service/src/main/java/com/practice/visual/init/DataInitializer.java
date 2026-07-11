@@ -4,25 +4,25 @@ import com.practice.visual.entity.DashboardScreen;
 import com.practice.visual.entity.VideoAlarmTask;
 import com.practice.visual.entity.VideoDevice;
 import com.practice.visual.entity.VideoStreamProxy;
-import com.practice.visual.repository.DashboardScreenRepo;
-import com.practice.visual.repository.VideoAlarmTaskRepo;
-import com.practice.visual.repository.VideoDeviceRepo;
-import com.practice.visual.repository.VideoStreamProxyRepo;
+import com.practice.visual.dao.DashboardScreenDao;
+import com.practice.visual.dao.VideoAlarmTaskDao;
+import com.practice.visual.dao.VideoDeviceDao;
+import com.practice.visual.dao.VideoStreamProxyDao;
 import org.springframework.boot.CommandLineRunner;
 import org.springframework.stereotype.Component;
 
 @Component
 public class DataInitializer implements CommandLineRunner {
-    private final DashboardScreenRepo screens;
-    private final VideoDeviceRepo videos;
-    private final VideoStreamProxyRepo streams;
-    private final VideoAlarmTaskRepo tasks;
+    private final DashboardScreenDao screens;
+    private final VideoDeviceDao videos;
+    private final VideoStreamProxyDao streams;
+    private final VideoAlarmTaskDao tasks;
 
     public DataInitializer(
-        DashboardScreenRepo screens,
-        VideoDeviceRepo videos,
-        VideoStreamProxyRepo streams,
-        VideoAlarmTaskRepo tasks
+        DashboardScreenDao screens,
+        VideoDeviceDao videos,
+        VideoStreamProxyDao streams,
+        VideoAlarmTaskDao tasks
     ) {
         this.screens = screens;
         this.videos = videos;

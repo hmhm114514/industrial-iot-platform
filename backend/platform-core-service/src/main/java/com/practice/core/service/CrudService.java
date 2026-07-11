@@ -4,14 +4,14 @@ import com.practice.common.*;import com.practice.core.entity.*;import org.spring
 
 @Service
 public class CrudService<T extends BaseEntity> {
-    public List<T> list(JpaRepository<T,Long> repo, String keyword){ return CrudSupport.search(repo, keyword); }
-    public T get(JpaRepository<T,Long> repo, Long id){ return repo.findById(id).orElseThrow(); }
-    public T create(JpaRepository<T,Long> repo, T body){ return repo.save(body); }
-    public T update(JpaRepository<T,Long> repo, Long id, T body){ T old=repo.findById(id).orElseThrow(); return repo.save(CrudSupport.merge(old,body)); }
-    public boolean delete(JpaRepository<T,Long> repo, Long id){ repo.deleteById(id); return true; }
-    public T toggle(JpaRepository<T,Long> repo, Long id){
-        T old=repo.findById(id).orElseThrow(); boolean active="ENABLED".equals(old.status)||"ONLINE".equals(old.status)||"RUNNING".equals(old.status);
-        old.status=active?"DISABLED":"ENABLED"; if(old instanceof Rule r) r.enabled=!active; if(old instanceof AiAgent a) a.enabled=!active; if(old instanceof TaskJob t){t.running=!active;t.status=t.running?"RUNNING":"STOPPED";} return repo.save(old);
+    public List<T> list(JpaRepository<T,Long> dao, String keyword){ return CrudSupport.search(dao, keyword); }
+    public T get(JpaRepository<T,Long> dao, Long id){ return dao.findById(id).orElseThrow(); }
+    public T create(JpaRepository<T,Long> dao, T body){ return dao.save(body); }
+    public T update(JpaRepository<T,Long> dao, Long id, T body){ T old=dao.findById(id).orElseThrow(); return dao.save(CrudSupport.merge(old,body)); }
+    public boolean delete(JpaRepository<T,Long> dao, Long id){ dao.deleteById(id); return true; }
+    public T toggle(JpaRepository<T,Long> dao, Long id){
+        T old=dao.findById(id).orElseThrow(); boolean active="ENABLED".equals(old.status)||"ONLINE".equals(old.status)||"RUNNING".equals(old.status);
+        old.status=active?"DISABLED":"ENABLED"; if(old instanceof Rule r) r.enabled=!active; if(old instanceof AiAgent a) a.enabled=!active; if(old instanceof TaskJob t){t.running=!active;t.status=t.running?"RUNNING":"STOPPED";} return dao.save(old);
     }
-    public T status(JpaRepository<T,Long> repo, Long id, String status){ T old=repo.findById(id).orElseThrow(); old.status=status; return repo.save(old); }
+    public T status(JpaRepository<T,Long> dao, Long id, String status){ T old=dao.findById(id).orElseThrow(); old.status=status; return dao.save(old); }
 }

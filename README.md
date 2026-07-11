@@ -33,6 +33,7 @@ industrial-iot-platform/
 - 简化 Token 鉴权
 
 后端当前由 `gateway-service`、`platform-core-service`、`visual-video-service` 和 `platform-common` 组成。前端统一访问 `gateway-service` 暴露的 `/api/**`，网关再转发到平台核心服务和可视化视频服务。
+其中业务服务内部采用 Controller、Service、DAO 三层架构：Controller 负责接口入口，Service 负责编排业务流程，DAO 基于 Spring Data JPA 负责数据访问。
 
 ### 前端
 
