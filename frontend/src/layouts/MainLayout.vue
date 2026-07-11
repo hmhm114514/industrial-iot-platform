@@ -85,6 +85,7 @@
             <template #dropdown>
               <el-dropdown-menu>
                 <el-dropdown-item command="identity">当前身份：{{ userInfo.roleName || userInfo.role || '平台管理员' }}</el-dropdown-item>
+                <el-dropdown-item command="password">修改密码</el-dropdown-item>
                 <el-dropdown-item divided command="logout">切换账号 / 退出登录</el-dropdown-item>
               </el-dropdown-menu>
             </template>
@@ -100,17 +101,28 @@
         </router-view>
       </el-main>
     </el-container>
+    <el-dialog v-model="passwordVisible" title="修改密码" width="420px">
+      <el-form :model="passwordForm" label-width="90px">
+        <el-form-item label="原密码"><el-input v-model="passwordForm.oldPassword" type="password" show-password /></el-form-item>
+        <el-form-item label="新密码"><el-input v-model="passwordForm.newPassword" type="password" show-password /></el-form-item>
+        <el-form-item label="确认密码"><el-input v-model="passwordForm.confirmPassword" type="password" show-password /></el-form-item>
+      </el-form>
+      <template #footer>
+        <el-button @click="passwordVisible = false">取消</el-button>
+        <el-button type="primary" @click="submitPassword">确认修改</el-button>
+      </template>
+    </el-dialog>
   </el-container>
 </template>
 
 <script setup>
-import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
+import { computed, onBeforeUnmount, onMounted, reactive, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import * as Icons from '@element-plus/icons-vue'
 import { ArrowDown } from '@element-plus/icons-vue'
 import { ElMessage } from 'element-plus'
 import { filterMenusByRole, findMenuTrail } from '../config/menu'
-import { resourceApi } from '../api/platform'
+import { resourceApi, userApi } from '../api/platform'
 import { closeRealtime, connectRealtime } from '../api/realtime'
 
 const route = useRoute()
@@ -122,6 +134,8 @@ const readUser = () => {
   try { return JSON.parse(localStorage.getItem('iot_user') || '{}') } catch { return {} }
 }
 const userInfo = ref(readUser())
+const passwordVisible = ref(false)
+const passwordForm = reactive({ oldPassword: '', newPassword: '', confirmPassword: '' })
 const highAlarms = ref([])
 const readAlarmIds = ref(JSON.parse(localStorage.getItem('iot_read_alarm_ids') || '[]'))
 const notifiedAlarmIds = ref(JSON.parse(localStorage.getItem('iot_notified_alarm_ids') || '[]'))
@@ -145,11 +159,33 @@ const handleCommand = (command) => {
     ElMessage.info(`${userInfo.value.username || '当前用户'} · ${userRole.value}`)
     return
   }
+  if (command === 'password') {
+    Object.assign(passwordForm, { oldPassword: '', newPassword: '', confirmPassword: '' })
+    passwordVisible.value = true
+    return
+  }
   if (command === 'logout') {
     localStorage.removeItem('iot_token')
+    localStorage.removeItem('iot_token_expires_at')
     localStorage.removeItem('iot_user')
     ElMessage.success('已退出登录')
     router.replace('/login')
+  }
+}
+
+const submitPassword = async () => {
+  if (!passwordForm.oldPassword || !passwordForm.newPassword) return ElMessage.warning('请填写原密码和新密码')
+  if (passwordForm.newPassword !== passwordForm.confirmPassword) return ElMessage.warning('两次输入的新密码不一致')
+  try {
+    await userApi.changePassword({ oldPassword: passwordForm.oldPassword, newPassword: passwordForm.newPassword })
+    ElMessage.success('密码已修改，请重新登录')
+    passwordVisible.value = false
+    localStorage.removeItem('iot_token')
+    localStorage.removeItem('iot_token_expires_at')
+    localStorage.removeItem('iot_user')
+    router.replace('/login')
+  } catch (error) {
+    ElMessage.error(error?.message || '密码修改失败')
   }
 }
 
@@ -161,12 +197,13 @@ const persistAlarmState = () => {
 const isHighAlarm = (alarm) => {
   const level = String(alarm.level || alarm.alarmLevel || '').toUpperCase()
   const status = String(alarm.status || '').toUpperCase()
-  return ['高', 'HIGH'].includes(level) && !['已处理', 'CLOSED', 'CLOSE'].includes(status)
+  return ['高', 'HIGH'].includes(level) && !['已关闭', '已恢复', 'CLOSED', 'CLOSE', 'RECOVERED'].includes(status)
 }
 
 const loadAlarmMessages = async () => {
   try {
-    const rows = await resourceApi.list('historicalAlarm')
+    const payload = await resourceApi.list('historicalAlarm', { page: 1, size: 100 })
+    const rows = Array.isArray(payload) ? payload : payload.content || []
     highAlarms.value = rows.filter(isHighAlarm).sort((a, b) => new Date(b.createdAt || b.time || 0) - new Date(a.createdAt || a.time || 0))
     highAlarms.value
       .filter((alarm) => !notifiedAlarmIds.value.includes(alarm.id))

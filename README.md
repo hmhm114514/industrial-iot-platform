@@ -132,13 +132,13 @@ cd frontend
 安装依赖：
 
 ```bash
-npm install
+pnpm install
 ```
 
 启动开发服务：
 
 ```bash
-npm run dev
+pnpm run dev
 ```
 
 前端默认访问地址：

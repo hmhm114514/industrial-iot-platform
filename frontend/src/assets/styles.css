@@ -435,10 +435,8 @@ body.dark .map-shell { background: linear-gradient(135deg, #0a1a31, #0f2a4f); }
   .search-input { width: 100%; }
   .screen-grid { grid-template-columns: 1fr; }
   .screen-panel.wide { grid-column: span 1; }
-<<<<<<< HEAD
   .history-content { grid-template-columns: 1fr; }
   .alarm-donut-panel { border-right: 0; border-bottom: 1px solid var(--line); padding: 14px 8px 18px; }
-=======
   .local-camera-page .camera-workspace { grid-template-columns: 1fr; }
   .local-camera-page .camera-settings { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0 22px; }
   .local-camera-page .settings-heading, .local-camera-page .camera-facts, .local-camera-page .recording-support-note { grid-column: 1 / -1; }
@@ -449,7 +447,6 @@ body.dark .map-shell { background: linear-gradient(135deg, #0a1a31, #0f2a4f); }
   .monitor-device-page .monitor-device-hero-actions { width: 100%; grid-template-columns: 1fr 1fr; }
   .monitor-device-page .monitor-workstation-chip { justify-self: start; }
   .monitor-device-page .monitor-stat-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
->>>>>>> origin/video
 }
 @media (max-width: 760px) {
   .sidebar { position: fixed; z-index: 50; transform: translateX(-100%); }

@@ -77,12 +77,14 @@ const submit = async () => {
     const data = await authApi.login({ username: form.username, password: form.password })
     const token = pickToken(data) || `platform-token-${Date.now()}`
     localStorage.setItem('iot_token', token)
+    localStorage.setItem('iot_token_expires_at', String(Date.now() + 2 * 60 * 60 * 1000))
     localStorage.setItem('iot_user', JSON.stringify(normalizeUser(data)))
     ElMessage.success('登录成功')
     router.replace('/dashboard')
   } catch (error) {
     if (form.username === 'admin' && form.password === '123456') {
       localStorage.setItem('iot_token', `platform-local-token-${Date.now()}`)
+      localStorage.setItem('iot_token_expires_at', String(Date.now() + 2 * 60 * 60 * 1000))
       localStorage.setItem('iot_user', JSON.stringify({ username: 'admin', realName: '系统管理员', role: '超级管理员', roleName: '超级管理员' }))
       ElMessage.warning('工业物联网智能平台服务暂不可用，已进入本地运行模式')
       router.replace('/dashboard')

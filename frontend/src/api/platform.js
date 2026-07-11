@@ -33,9 +33,24 @@ const endpointOf = (kind) => endpoints[kind] || `/${kind}`
 
 const timeText = (value) => value ? String(value).replace('T', ' ').slice(0, 19) : ''
 const cnLevel = (value) => ({ HIGH: '高', MEDIUM: '中', LOW: '低', INFO: '低', high: '高', medium: '中', low: '低' }[value] || value || '中')
-const alarmStatus = (value) => ['CLOSED', 'closed', '已处理'].includes(value) ? '已处理' : '未处理'
+const alarmStatus = (value) => ({
+  OPEN: '未确认',
+  ACKNOWLEDGED: '已确认',
+  PROCESSING: '处理中',
+  RECOVERED: '已恢复',
+  CLOSED: '已关闭',
+  closed: '已关闭',
+  已处理: '已关闭'
+}[value] || value || '未确认')
 const shortDate = (value) => String(value || '').slice(5) || value
 const alarmRuleName = (item) => item.ruleName || String(item.content || '').match(/触发规则[:：]\s*(.+)$/)?.[1] || ''
+const durationText = (seconds) => {
+  const value = Number(seconds || 0)
+  if (!value) return '-'
+  if (value < 60) return `${value}秒`
+  if (value < 3600) return `${Math.floor(value / 60)}分${value % 60}秒`
+  return `${Math.floor(value / 3600)}小时${Math.floor(value % 3600 / 60)}分`
+}
 export const telemetryMetrics = [
   { label: '温度 temperature', value: 'temperature', unit: '℃' },
   { label: '湿度 humidity', value: 'humidity', unit: '%' },
@@ -111,7 +126,13 @@ const adaptItem = (kind, item = {}) => {
   }
 }
 
+const adaptPage = (kind, payload) => ({
+  ...payload,
+  content: adaptList(kind, payload.content || [])
+})
+
 const adaptList = (kind, payload) => {
+  if (payload && typeof payload === 'object' && Array.isArray(payload.content)) return adaptPage(kind, payload)
   if (kind === 'screenGroup' && Array.isArray(payload)) {
     const groups = new Map()
     payload.forEach((item) => {
@@ -141,7 +162,7 @@ const adaptList = (kind, payload) => {
     })
   }
   if (kind === 'historicalAlarm' && Array.isArray(payload)) {
-    return payload.map((item) => ({ ...adaptItem(kind, item), title: item.title || item.name, ruleName: alarmRuleName(item), value: item.value || item.content, status: alarmStatus(item.status), level: cnLevel(item.level), time: timeText(item.createdAt) }))
+    return payload.map((item) => ({ ...adaptItem(kind, item), title: item.title || item.name, ruleName: alarmRuleName(item), value: item.value || item.content, status: alarmStatus(item.status), level: cnLevel(item.level), time: timeText(item.createdAt), recoveredAt: timeText(item.recoveredAt), handledAt: timeText(item.handledAt), finishTime: timeText(item.recoveredAt || item.handledAt), durationText: durationText(item.durationSeconds) }))
   }
   return Array.isArray(payload) ? payload.map((item) => adaptItem(kind, item)) : payload
 }
@@ -178,6 +199,7 @@ export const dashboardApi = {
 
 export const resourceApi = {
   list: async (kind, params) => adaptList(kind, await http.get(endpointOf(kind), { params })),
+  stats: (kind, params) => http.get(`${endpointOf(kind)}/stats`, { params }),
   create: (kind, data) => http.post(endpointOf(kind), data),
   update: (kind, id, data) => http.put(`${endpointOf(kind)}/${id}`, data),
   remove: (kind, id) => http.delete(`${endpointOf(kind)}/${id}`),
@@ -190,7 +212,12 @@ export const telemetryApi = {
 }
 
 export const alarmApi = {
-  handle: (id, payload) => http.post(`/alarms/${id}/handle`, payload)
+  handle: (id, payload) => http.post(`/alarms/${id}/handle`, payload),
+  status: (id, payload) => http.post(`/alarms/${id}/status`, payload)
+}
+
+export const userApi = {
+  changePassword: (payload) => http.post('/users/password', payload)
 }
 
 export const taskApi = {

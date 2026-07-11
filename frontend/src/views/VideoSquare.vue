@@ -1,18 +1,10 @@
 <template>
-<<<<<<< HEAD
-  <div class="page-stack">
-    <section class="module-head">
-      <div>
-        <el-tag effect="dark" class="hero-tag">视频中心</el-tag>
-        <h1>视频广场</h1>
-=======
   <div class="local-camera-page">
     <header class="camera-hero">
       <div class="camera-hero-copy">
         <span class="camera-eyebrow">视频中心 · 当前工作站</span>
         <h1>监控查看</h1>
         <p>按已登记的工业监控档案连接当前工作站摄像头。实时画面默认只在本地处理，不会自动上传。</p>
->>>>>>> origin/video
       </div>
       <div class="camera-hero-action">
         <span class="camera-status-announcer" role="status" aria-live="polite" aria-atomic="true">当前状态：{{ statusMeta.label }}</span>

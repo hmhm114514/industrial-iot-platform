@@ -38,7 +38,7 @@
               />
             </svg>
             <div class="alarm-donut-center">
-              <strong>{{ filteredRows.length }}</strong>
+              <strong>{{ total }}</strong>
               <span>总条数</span>
             </div>
             <div v-if="hoveredAlarm" class="alarm-donut-tooltip">
@@ -56,10 +56,10 @@
         <section class="history-main">
           <div class="history-summary">
             <span>数据摘要</span>
-            <el-tag type="info" round>共 {{ filteredRows.length }} 条</el-tag>
+            <el-tag type="info" round>共 {{ total }} 条</el-tag>
             <el-tag v-for="item in alarmSummary" :key="item.status" :type="alarmTag(item.status)" round>{{ item.status }} {{ item.count }}项</el-tag>
           </div>
-          <el-table :data="pagedRows" stripe>
+          <el-table :data="rows" stripe @sort-change="handleSortChange">
             <el-table-column label="序号" width="80">
               <template #default="{ $index }">{{ (page.current - 1) * page.size + $index + 1 }}</template>
             </el-table-column>
@@ -69,15 +69,15 @@
             <el-table-column label="告警状态" width="115" align="center">
               <template #default="{ row }"><el-tag :type="alarmTag(row.alarmStatus)" round>{{ row.alarmStatus }}</el-tag></template>
             </el-table-column>
-            <el-table-column prop="time" label="上报时间" width="180" />
-            <el-table-column prop="deviceName" label="设备名称" min-width="190" />
+            <el-table-column prop="time" column-key="reportTime" label="上报时间" width="180" sortable="custom" />
+            <el-table-column prop="deviceName" label="设备名称" min-width="190" sortable="custom" />
             <el-table-column prop="ruleName" label="规则名称" min-width="180" />
             <el-table-column label="详情" width="100" align="center" fixed="right">
               <template #default="{ row }"><el-button link type="primary" @click="openDetail(row)">查看</el-button></template>
             </el-table-column>
           </el-table>
           <div class="table-pagination">
-            <el-pagination v-model:current-page="page.current" v-model:page-size="page.size" :page-sizes="[10, 20, 50]" layout="total, sizes, prev, pager, next" :total="filteredRows.length" />
+            <el-pagination v-model:current-page="page.current" v-model:page-size="page.size" :page-sizes="[10, 20, 50]" layout="total, sizes, prev, pager, next" :total="total" />
           </div>
         </section>
       </div>
@@ -102,6 +102,8 @@ import { fallbackRows } from '../utils/fallback'
 import { clone, normalizeList } from '../utils/data'
 
 const rows = ref([])
+const total = ref(0)
+const stats = ref({ alarmSummary: { 正常: 0, 低: 0, 中: 0, 高: 0 } })
 const devices = ref([])
 const products = ref([])
 const productCategories = ref([])
@@ -109,23 +111,13 @@ const deviceGroups = ref([])
 const rules = ref([])
 const query = reactive({ productGroup: '', deviceGroup: '', deviceName: '', metric: '' })
 const page = reactive({ current: 1, size: 20 })
+const sort = reactive({ sortBy: 'reportTime', direction: 'desc' })
 const detailVisible = ref(false)
 const currentDetail = ref(null)
 const hoverSegment = ref(null)
 
-const filteredRows = computed(() => {
-  const deviceName = query.deviceName.trim().toLowerCase()
-  return rows.value.filter((row) => {
-    const matchDevice = !deviceName || String(row.deviceName || '').toLowerCase().includes(deviceName)
-    const matchProductGroup = !query.productGroup || row.productGroup === query.productGroup
-    const matchDeviceGroup = !query.deviceGroup || row.deviceGroup === query.deviceGroup
-    const matchMetric = !query.metric || row.metrics.some((metric) => metric.metric === query.metric)
-    return matchProductGroup && matchDeviceGroup && matchDevice && matchMetric
-  })
-})
-const pagedRows = computed(() => filteredRows.value.slice((page.current - 1) * page.size, page.current * page.size))
 const detailTitle = computed(() => currentDetail.value ? `${currentDetail.value.deviceName} - ${currentDetail.value.time}` : '指标详情')
-const alarmSummary = computed(() => ['正常', '低', '中', '高'].map((status) => ({ status, count: filteredRows.value.filter((row) => row.alarmStatus === status).length })))
+const alarmSummary = computed(() => ['正常', '低', '中', '高'].map((status) => ({ status, count: Number(stats.value.alarmSummary?.[status] || 0) })))
 const alarmCount = (status) => alarmSummary.value.find((item) => item.status === status)?.count || 0
 const alarmColors = { 正常: '#67c23a', 低: '#f3c96b', 中: '#e6a23c', 高: '#f56c6c' }
 const polar = (angle, radius = 70) => {
@@ -139,14 +131,14 @@ const arcPath = (start, end) => {
   return `M ${from.x} ${from.y} A 70 70 0 ${large} 1 ${to.x} ${to.y}`
 }
 const alarmSegments = computed(() => {
-  const total = filteredRows.value.length
-  if (!total) return [{ status: '无数据', count: 0, percent: 100, color: 'rgba(148,163,184,.32)', path: arcPath(0, 359.99) }]
+  const chartTotal = total.value
+  if (!chartTotal) return [{ status: '无数据', count: 0, percent: 100, color: 'rgba(148,163,184,.32)', path: arcPath(0, 359.99) }]
   let cursor = 0
   return alarmSummary.value.filter((item) => item.count > 0).map((item) => {
-    const degrees = item.count / total * 360
+    const degrees = item.count / chartTotal * 360
     const segment = {
       ...item,
-      percent: Math.round(item.count / total * 1000) / 10,
+      percent: Math.round(item.count / chartTotal * 1000) / 10,
       color: alarmColors[item.status],
       path: arcPath(cursor, Math.min(cursor + degrees, 359.99))
     }
@@ -203,7 +195,7 @@ const search = async () => { page.current = 1; await load() }
 const load = async () => {
   try {
     const [telemetry, deviceList, productList, categoryList, groupList, ruleList] = await Promise.all([
-      resourceApi.list('historicalData', query),
+      resourceApi.list('historicalData', { ...query, ...sort, page: page.current, size: page.size }),
       resourceApi.list('device'),
       resourceApi.list('product'),
       resourceApi.list('productCategory'),
@@ -215,16 +207,27 @@ const load = async () => {
     productCategories.value = normalizeList(categoryList)
     deviceGroups.value = normalizeList(groupList)
     rules.value = normalizeList(ruleList)
-    rows.value = enrichRows(normalizeList(telemetry))
+    rows.value = enrichRows(normalizeList(telemetry.content || telemetry))
+    total.value = Number(telemetry.total ?? rows.value.length)
+    stats.value = await resourceApi.stats('historicalData', query)
   } catch (error) {
     quietError(error, '数据服务暂不可用，当前为演示数据')
     rows.value = clone(fallbackRows.historicalData).map((row) => ({ ...row, metrics: [{ metric: row.metric, label: row.metric, value: row.value, unit: row.unit }], metricValues: { [row.metric]: row.value }, productGroup: '-', deviceGroup: '-', deviceCode: '-', ruleName: '-', alarmStatus: '正常' }))
+    total.value = rows.value.length
+    stats.value = { alarmSummary: { 正常: rows.value.length, 低: 0, 中: 0, 高: 0 } }
   }
 }
 const openDetail = (row) => { currentDetail.value = row; detailVisible.value = true }
 const handleRealtime = (event) => { if (event.detail?.type === 'telemetry') load() }
+const handleSortChange = ({ prop, column, order }) => {
+  sort.sortBy = column?.columnKey || prop || 'reportTime'
+  sort.direction = order === 'ascending' ? 'asc' : 'desc'
+  page.current = 1
+  load()
+}
 
 watch(() => [query.productGroup, query.deviceGroup, query.deviceName, query.metric, page.size], () => { page.current = 1 })
+watch(() => [page.current, page.size], load)
 onMounted(() => {
   load()
   window.addEventListener('iot-realtime', handleRealtime)

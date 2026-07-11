@@ -61,6 +61,13 @@ const router = createRouter({
 router.beforeEach((to) => {
   document.title = to.meta?.title ? `${to.meta.title} - 工业物联网智能平台` : '工业物联网智能平台'
   const token = localStorage.getItem('iot_token')
+  const expiresAt = Number(localStorage.getItem('iot_token_expires_at') || 0)
+  if (expiresAt && Date.now() > expiresAt) {
+    localStorage.removeItem('iot_token')
+    localStorage.removeItem('iot_token_expires_at')
+    localStorage.removeItem('iot_user')
+    if (!to.meta.public) return '/login'
+  }
   if (!to.meta.public && !token) return '/login'
   if (to.path === '/login' && token) return '/dashboard'
   if (to.path.startsWith('/system/')) {
