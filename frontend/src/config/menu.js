@@ -40,12 +40,8 @@ export const menus = [
     title: '视频中心',
     icon: 'VideoCamera',
     children: [
-      { title: '国标设备', path: '/video/gb-devices', kind: 'gbDevice' },
-      { title: '拉流代理', path: '/video/proxies', kind: 'streamProxy' },
-      { title: '视频广场', path: '/video/square', special: 'VideoSquare' },
-      { title: '流媒体服务', path: '/video/media-services', kind: 'mediaService' },
-      { title: '录像回放', path: '/video/records', kind: 'videoRecord' },
-      { title: '视频告警', path: '/video/alarms', kind: 'videoAlarm' }
+      { title: '监控设备', path: '/video/devices', special: 'LocalCameraDevices' },
+      { title: '监控查看', path: '/video/monitor', special: 'VideoSquare' }
     ]
   },
   {
