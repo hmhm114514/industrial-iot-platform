@@ -100,11 +100,6 @@ Authorization: Bearer panda-iot-demo-token
 - `GET /api/alarms` 告警查询
 - `POST /api/alarms/{id}/handle` 告警处置
 - `POST /api/alarms/{id}/close` 告警关闭
-- `GET/POST/PUT/DELETE /api/tasks` 任务 CRUD
-- `POST /api/tasks/{id}/start` 启动任务并生成任务日志
-- `POST /api/tasks/{id}/stop` 停止任务并生成任务日志
-- `GET /api/tasks/logs` 任务日志
-
 ### 扩展能力
 
 - `GET/POST/PUT/DELETE /api/network-services` 网络服务 CRUD
@@ -120,8 +115,7 @@ Authorization: Bearer panda-iot-demo-token
 - `GET /api/dashboard/monitor` 服务监控样例数据
 - `GET/POST/PUT/DELETE /api/users` 用户管理
 - `GET/POST/PUT/DELETE /api/roles` 角色管理
-- `GET /api/operation-logs` 操作日志
-- `GET /api/login-logs` 登录日志
+- `GET /api/operation-logs` 操作日志，包含登录、规则、设备、视频和智能体等操作审计
 
 列表接口支持 `?keyword=xxx` 关键词筛选；继承通用 CRUD 的关键实体支持 `POST /api/{resource}/{id}/toggle` 状态切换。
 

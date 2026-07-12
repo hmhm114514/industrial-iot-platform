@@ -8,7 +8,8 @@
 - 后端核心服务已启动
 - 网络服务中的 `MQTT接入服务` 为运行中
 - 设备管理中存在设备 Key：`key-th-001`
-- 规则设计中存在并启用了对应指标规则，例如 `temperature > 80`
+- 规则设计中存在并启用了对应指标规则，例如 `温度 > 80`
+- MQTT Payload 字段名必须和设备分组绑定的设备属性名一致，例如 `温度`、`湿度`、`压强`
 
 ## Topic
 
@@ -20,9 +21,9 @@
 
 ```json
 {
-  "temperature": 91.2,
-  "humidity": 51,
-  "pressure": 102.4
+  "温度": 91.2,
+  "湿度": 51,
+  "压强": 102.4
 }
 ```
 
@@ -32,9 +33,9 @@
 
 ```powershell
 $payload = @{
-  temperature = 91.2
-  humidity = 51
-  pressure = 102.4
+  温度 = 91.2
+  湿度 = 51
+  压强 = 102.4
 } | ConvertTo-Json -Compress
 
 docker exec pandax-mqtt-broker mosquitto_pub `
@@ -46,14 +47,14 @@ docker exec pandax-mqtt-broker mosquitto_pub `
 
 ## 持续随机发送数据
 
-每 2 秒发送一次随机温度、湿度、压力数据。
+每 2 秒发送一次随机温度、湿度、压强数据。
 
 ```powershell
 while ($true) {
   $payload = @{
-    temperature = Get-Random -Minimum 70 -Maximum 100
-    humidity = Get-Random -Minimum 40 -Maximum 80
-    pressure = Get-Random -Minimum 95 -Maximum 120
+    温度 = Get-Random -Minimum 70 -Maximum 100
+    湿度 = Get-Random -Minimum 40 -Maximum 80
+    压强 = Get-Random -Minimum 95 -Maximum 120
   } | ConvertTo-Json -Compress
 
   docker exec pandax-mqtt-broker mosquitto_pub `
@@ -73,9 +74,9 @@ while ($true) {
 ```powershell
 for ($temp = 70; $temp -le 100; $temp += 2) {
   $payload = @{
-    temperature = $temp
-    humidity = 55
-    pressure = 101.3
+    温度 = $temp
+    湿度 = 55
+    压强 = 101.3
   } | ConvertTo-Json -Compress
 
   docker exec pandax-mqtt-broker mosquitto_pub `
@@ -99,7 +100,7 @@ docker exec -it pandax-mqtt-broker sh
 然后在容器内执行：
 
 ```sh
-mosquitto_pub -h localhost -p 1883 -t /iot/key-th-001/telemetry -m '{"temperature":91.2,"humidity":51,"pressure":102.4}'
+mosquitto_pub -h localhost -p 1883 -t /iot/key-th-001/telemetry -m '{"温度":91.2,"湿度":51,"压强":102.4}'
 ```
 
 ## CMD 单条测试命令
@@ -107,13 +108,13 @@ mosquitto_pub -h localhost -p 1883 -t /iot/key-th-001/telemetry -m '{"temperatur
 在 `cmd.exe` 中执行，不要在 PowerShell 中执行。
 
 ```cmd
-docker exec pandax-mqtt-broker mosquitto_pub -h localhost -p 1883 -t /iot/key-th-001/telemetry -m "{\"temperature\":91.2,\"humidity\":51,\"pressure\":102.4}"
+docker exec pandax-mqtt-broker mosquitto_pub -h localhost -p 1883 -t /iot/key-th-001/telemetry -m "{\"温度\":91.2,\"湿度\":51,\"压强\":102.4}"
 ```
 
 后端日志中应该看到：
 
 ```text
-payload={"temperature":91.2,"humidity":51,"pressure":102.4}
+payload={"温度":91.2,"湿度":51,"压强":102.4}
 MQTT telemetry processed: ...
 ```
 
@@ -125,7 +126,7 @@ MQTT telemetry processed: ...
 set /a "temperature=%random% % 31 + 70"
 set /a "humidity=%random% % 41 + 40"
 set /a "pressure=%random% % 26 + 95"
-docker exec pandax-mqtt-broker mosquitto_pub -h localhost -p 1883 -t /iot/key-th-001/telemetry -m "{\"temperature\":%temperature%,\"humidity\":%humidity%,\"pressure\":%pressure%}"
+docker exec pandax-mqtt-broker mosquitto_pub -h localhost -p 1883 -t /iot/key-th-001/telemetry -m "{\"温度\":%temperature%,\"湿度\":%humidity%,\"压强\":%pressure%}"
 ```
 
 持续发送不要直接一行行粘贴到 CMD 窗口，建议保存为 `send-mqtt-loop.cmd` 后运行。保存成 `.cmd` 文件时，取模符号用 `%%`：
@@ -137,7 +138,7 @@ set /a "temperature=%random% %% 31 + 70"
 set /a "humidity=%random% %% 41 + 40"
 set /a "pressure=%random% %% 26 + 95"
 
-docker exec pandax-mqtt-broker mosquitto_pub -h localhost -p 1883 -t /iot/key-th-001/telemetry -m "{\"temperature\":%temperature%,\"humidity\":%humidity%,\"pressure\":%pressure%}"
+docker exec pandax-mqtt-broker mosquitto_pub -h localhost -p 1883 -t /iot/key-th-001/telemetry -m "{\"温度\":%temperature%,\"湿度\":%humidity%,\"压强\":%pressure%}"
 
 timeout /t 2 /nobreak >nul
 goto loop
@@ -145,12 +146,14 @@ goto loop
 
 ## CMD 趋势升温测试
 
+下面示例会让 `温度` 从 30 每次加 2 一直升到 80，同时 `压强 = 温度 + 50`，适合演示连续数据和规则检测。`湿度` 固定为 `0.5`。
+
 如果直接粘贴到 `cmd.exe` 中执行：
 
 ```cmd
-@echo off
-for /l %t in (70,2,100) do (
-  docker exec pandax-mqtt-broker mosquitto_pub -h localhost -p 1883 -t /iot/key-th-001/telemetry -m "{\"temperature\":%t,\"humidity\":55,\"pressure\":101.3}"
+for /l %t in (30,2,80) do (
+  set /a p=%t+50
+  call docker exec pandax-mqtt-broker mosquitto_pub -h localhost -p 1883 -t /iot/key-th-001/telemetry -m "{\"温度\":%t,\"湿度\":0.5,\"压强\":%%p%%}"
   timeout /t 1 /nobreak >nul
 )
 ```
@@ -159,11 +162,14 @@ for /l %t in (70,2,100) do (
 
 ```cmd
 @echo off
-for /l %%t in (70,2,100) do (
-  docker exec pandax-mqtt-broker mosquitto_pub -h localhost -p 1883 -t /iot/key-th-001/telemetry -m "{\"temperature\":%%t,\"humidity\":55,\"pressure\":101.3}"
+for /l %%t in (30,2,80) do (
+  set /a p=%%t+50
+  call docker exec pandax-mqtt-broker mosquitto_pub -h localhost -p 1883 -t /iot/key-th-001/telemetry -m "{\"温度\":%%t,\"湿度\":0.5,\"压强\":%%p%%}"
   timeout /t 1 /nobreak >nul
 )
 ```
+
+注意：`压强` 不能写成 `%t + 50` 放进 JSON。CMD 不会在 JSON 字符串里自动计算表达式，必须先用 `set /a p=...` 算出变量，再把 `%p%` 或 `%%p%%` 放进 Payload。
 
 ## CMD 仍然不行时的稳定方案
 
@@ -176,7 +182,7 @@ docker exec -it pandax-mqtt-broker sh
 进入容器后执行单条发送：
 
 ```sh
-mosquitto_pub -h localhost -p 1883 -t /iot/key-th-001/telemetry -m '{"temperature":91.2,"humidity":51,"pressure":102.4}'
+mosquitto_pub -h localhost -p 1883 -t /iot/key-th-001/telemetry -m '{"温度":91.2,"湿度":51,"压强":102.4}'
 ```
 
 进入容器后执行持续发送：
@@ -186,7 +192,7 @@ while true; do
   temperature=$((70 + RANDOM % 31))
   humidity=$((40 + RANDOM % 41))
   pressure=$((95 + RANDOM % 26))
-  mosquitto_pub -h localhost -p 1883 -t /iot/key-th-001/telemetry -m "{\"temperature\":$temperature,\"humidity\":$humidity,\"pressure\":$pressure}"
+  mosquitto_pub -h localhost -p 1883 -t /iot/key-th-001/telemetry -m "{\"温度\":$temperature,\"湿度\":$humidity,\"压强\":$pressure}"
   sleep 2
 done
 ```
@@ -206,4 +212,57 @@ done
 
 ```text
 Ctrl + C
+```
+
+## CMD 中文字段名与算术表达式注意事项
+
+如果后端日志出现类似下面的错误：
+
+```text
+MQTT telemetry message ignored: Unexpected character ('+')
+payload={"�¶�":56,"ʪ��":0.5,"ѹǿ":56 + 50}
+```
+
+通常有两个原因：
+
+1. JSON 中不能直接写 `56 + 50` 这种表达式，必须先用 CMD 计算出结果。
+2. CMD 默认编码可能不是 UTF-8，中文字段名会变成乱码，导致无法匹配设备属性。
+
+直接在 `cmd.exe` 中执行时，推荐使用：
+
+```cmd
+chcp 65001
+for /l %t in (30,2,80) do @set /a p=%t+50 & call docker exec pandax-mqtt-broker mosquitto_pub -h localhost -p 1883 -t /iot/key-th-001/telemetry -m "{\"温度\":%t,\"湿度\":0.5,\"压强\":%%p%%}" & timeout /t 1 /nobreak >nul
+```
+
+如果保存成 `.cmd` 文件执行，推荐使用，并将文件编码保存为 `UTF-8`：
+
+```cmd
+@echo off
+chcp 65001 >nul
+for /l %%t in (30,2,80) do (
+  set /a p=%%t+50
+  call docker exec pandax-mqtt-broker mosquitto_pub -h localhost -p 1883 -t /iot/key-th-001/telemetry -m "{\"温度\":%%t,\"湿度\":0.5,\"压强\":%%p%%}"
+  timeout /t 1 /nobreak >nul
+)
+```
+
+更稳定的方式是使用 PowerShell，避免 CMD 中文编码问题：
+
+```powershell
+for ($temp = 30; $temp -le 80; $temp += 2) {
+  $payload = @{
+    温度 = $temp
+    湿度 = 0.5
+    压强 = $temp + 50
+  } | ConvertTo-Json -Compress
+
+  docker exec pandax-mqtt-broker mosquitto_pub `
+    -h localhost `
+    -p 1883 `
+    -t /iot/key-th-001/telemetry `
+    -m "$payload"
+
+  Start-Sleep -Seconds 1
+}
 ```

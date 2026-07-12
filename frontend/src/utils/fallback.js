@@ -24,6 +24,11 @@ export const fallbackDashboard = {
 const commonTime = '2026-07-03 09:30:00'
 
 export const fallbackRows = {
+  deviceAttribute: [
+    { id: 1, name: '是否启用告警', valueType: 'BOOL', valueTypeText: 'bool类型', minEnabled: false, maxEnabled: false, range: '未启用', status: 'enabled', createdAt: commonTime },
+    { id: 2, name: '采样间隔', valueType: 'INT', valueTypeText: '整型', minEnabled: true, maxEnabled: true, minValue: 1, maxValue: 60, range: '1 ~ 60', status: 'enabled', createdAt: commonTime },
+    { id: 3, name: '温度', valueType: 'FLOAT', valueTypeText: '浮点型', minEnabled: true, maxEnabled: true, minValue: -20, maxValue: 120, range: '-20 ~ 120', status: 'enabled', createdAt: commonTime }
+  ],
   productCategory: [
     { id: 1, name: '环境监测', code: 'ENV', description: '温湿度、气体、水质等传感产品', status: 'enabled', createdAt: commonTime },
     { id: 2, name: '工业控制', code: 'CTRL', description: 'PLC、网关、执行机构', status: 'enabled', createdAt: commonTime }
@@ -33,8 +38,8 @@ export const fallbackRows = {
     { id: 2, name: '边缘网关 EG-4G', code: 'EG-4G', category: '工业控制', protocol: 'HTTP', deviceCount: 12, status: 'enabled', createdAt: commonTime }
   ],
   deviceGroup: [
-    { id: 1, name: '一号厂房', code: 'PLANT-A', location: '南京 / 江宁', owner: '运维一组', deviceCount: 45, status: 'enabled' },
-    { id: 2, name: '仓储冷链', code: 'COLD', location: '苏州 / 昆山', owner: '运维二组', deviceCount: 18, status: 'enabled' }
+    { id: 1, name: '一号厂房', code: 'PLANT-A', location: '南京 / 江宁', owner: '运维一组', attributeIds: '1,2', attributeNames: '是否启用告警，采样间隔', deviceCount: 45, status: 'enabled' },
+    { id: 2, name: '仓储冷链', code: 'COLD', location: '苏州 / 昆山', owner: '运维二组', attributeIds: '1,3', attributeNames: '是否启用告警，温度', deviceCount: 18, status: 'enabled' }
   ],
   device: [
     { id: 1, name: 'A区温度传感器-01', code: 'DEV-TH-001', product: '温湿度采集器 TH-200', group: '一号厂房', online: true, status: 'enabled', temperature: 31.6, location: '118.84,31.95', lastSeen: commonTime },
@@ -49,7 +54,7 @@ export const fallbackRows = {
     { id: 2, name: '网关透传脚本', language: 'Groovy', version: 'v1.0', status: 'draft', description: '提取子设备数据点' }
   ],
   rule: [
-    { id: 1, name: '温度超 38℃ 告警', metric: 'temperature', operator: '>', threshold: 38, level: '高', action: '生成告警并通知运维', enabled: true, status: 'enabled' }
+    { id: 1, name: '温度超 38℃ 告警', metric: '温度', operator: '>', threshold: 38, level: '高', action: '生成告警并通知运维', enabled: true, status: 'enabled' }
   ],
   ruleAudit: [
     { id: 1, ruleName: '温度超 38℃ 告警', device: 'A区温度传感器-01', result: '通过', detail: '31.6℃ 未触发', time: commonTime },
@@ -96,14 +101,6 @@ export const fallbackRows = {
     { id: 1, name: '认证服务', monitorObject: '用户认证服务', latency: '23ms', qps: 32, status: 'healthy', enabled: true },
     { id: 2, name: '遥测服务', monitorObject: '设备数据服务', latency: '41ms', qps: 118, status: 'healthy', enabled: true }
   ],
-  task: [
-    { id: 1, name: '设备在线状态扫描', cron: '0 */5 * * * ?', status: 'running', lastRun: commonTime, successRate: '99.2%', enabled: true },
-    { id: 2, name: '历史数据归档', cron: '0 0 2 * * ?', status: 'stopped', lastRun: '2026-07-02 02:00:00', successRate: '100%', enabled: false }
-  ],
-  taskLog: [
-    { id: 1, taskName: '设备在线状态扫描', status: '成功', message: '扫描 128 台设备，离线 21 台', time: commonTime },
-    { id: 2, taskName: '历史数据归档', status: '成功', message: '归档 24000 条遥测数据', time: '2026-07-02 02:00:08' }
-  ],
   user: [
     { id: 1, username: 'admin', nickname: '平台管理员', role: '超级管理员', phone: '13800000000', status: 'enabled', createdAt: commonTime },
     { id: 2, username: 'operator', nickname: '运维人员', role: '运维角色', phone: '13900000000', status: 'enabled', createdAt: commonTime }
@@ -119,10 +116,6 @@ export const fallbackRows = {
   operationLog: [
     { id: 1, user: 'admin', module: '设备管理', action: '新增设备', ip: '本地演示终端', time: commonTime, result: '成功' },
     { id: 2, user: 'admin', module: '规则引擎', action: '修改阈值', ip: '本地演示终端', time: commonTime, result: '成功' }
-  ],
-  loginLog: [
-    { id: 1, username: 'admin', ip: '本地演示终端', browser: 'Chrome', time: commonTime, result: '成功' },
-    { id: 2, username: 'operator', ip: '运维演示终端', browser: 'Edge', time: '2026-07-02 18:20:00', result: '成功' }
   ]
 }
 

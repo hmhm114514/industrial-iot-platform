@@ -1,6 +1,7 @@
 import http from './http'
 
 const endpoints = {
+  deviceAttribute: '/device-attributes',
   productCategory: '/product-categories',
   product: '/products',
   deviceGroup: '/device-groups',
@@ -19,13 +20,10 @@ const endpoints = {
   historicalData: '/telemetry',
   historicalAlarm: '/alarms',
   serviceMonitor: '/dashboard/monitor',
-  task: '/tasks',
-  taskLog: '/tasks/logs',
   user: '/users',
   role: '/roles',
   firmware: '/firmwares',
   operationLog: '/operation-logs',
-  loginLog: '/login-logs',
   aiAgent: '/ai-agents'
 }
 
@@ -33,6 +31,7 @@ const endpointOf = (kind) => endpoints[kind] || `/${kind}`
 
 const timeText = (value) => value ? String(value).replace('T', ' ').slice(0, 19) : ''
 const cnLevel = (value) => ({ HIGH: '高', MEDIUM: '中', LOW: '低', INFO: '低', high: '高', medium: '中', low: '低' }[value] || value || '中')
+const attributeTypeText = (value) => ({ BOOL: 'bool类型', INT: '整型', FLOAT: '浮点型', STRING: '字符型' }[value] || value || '-')
 const alarmStatus = (value) => ({
   OPEN: '未确认',
   ACKNOWLEDGED: '已确认',
@@ -44,6 +43,15 @@ const alarmStatus = (value) => ({
 }[value] || value || '未确认')
 const shortDate = (value) => String(value || '').slice(5) || value
 const alarmRuleName = (item) => item.ruleName || String(item.content || '').match(/触发规则[:：]\s*(.+)$/)?.[1] || ''
+const attributeRangeText = (item = {}) => {
+  if (!['INT', 'FLOAT'].includes(item.valueType)) return '未启用'
+  const minEnabled = item.minEnabled ?? item.rangeEnabled
+  const maxEnabled = item.maxEnabled ?? item.rangeEnabled
+  if (minEnabled && maxEnabled) return `${item.minValue ?? '-'} ~ ${item.maxValue ?? '-'}`
+  if (minEnabled) return `>= ${item.minValue ?? '-'}`
+  if (maxEnabled) return `<= ${item.maxValue ?? '-'}`
+  return '未启用'
+}
 const durationText = (seconds) => {
   const value = Number(seconds || 0)
   if (!value) return '-'
@@ -82,6 +90,8 @@ const adaptItem = (kind, item = {}) => {
   const status = item.status
   const base = { ...item, createdAt: timeText(item.createdAt) || item.createdAt, updatedAt: timeText(item.updatedAt) || item.updatedAt }
   switch (kind) {
+    case 'deviceAttribute':
+      return { ...base, minEnabled: item.minEnabled ?? item.rangeEnabled ?? false, maxEnabled: item.maxEnabled ?? item.rangeEnabled ?? false, valueTypeText: attributeTypeText(item.valueType), range: attributeRangeText(item) }
     case 'device':
       return { ...base, product: item.product || `产品#${item.productId || '-'}`, group: item.group || `分组#${item.groupId || '-'}`, online: status === 'ONLINE' || status === 'online', lastSeen: timeText(item.lastOnlineAt), temperature: item.temperature ?? '-' }
     case 'product':
@@ -107,18 +117,12 @@ const adaptItem = (kind, item = {}) => {
       return { ...base, source: item.source || item.streamUrl || item.playUrl || '厂区摄像机视频源', target: item.target || item.protocol || '网页播放', enabled: status !== 'DISABLED' }
     case 'videoAlarm':
       return { ...base, device: item.device || `视频设备#${item.videoDeviceId || '-'}`, type: item.type || item.algorithm || '区域入侵', level: cnLevel(item.level), time: timeText(item.createdAt) }
-    case 'task':
-      return { ...base, status: item.running || status === 'RUNNING' ? 'running' : 'stopped', lastRun: timeText(item.updatedAt || item.createdAt), successRate: item.successRate || '100%' }
-    case 'taskLog':
-      return { ...base, taskName: item.taskName || item.name || `任务#${item.taskId || '-'}`, message: item.message || item.result || item.detail, time: timeText(item.executeTime || item.createdAt), status: item.status === 'SUCCESS' ? '成功' : (item.status || '成功') }
     case 'user':
       return { ...base, nickname: item.nickname || item.realName || item.username, role: item.role || item.roleName || '平台管理员' }
     case 'firmware':
       return { ...base, product: item.product || item.targetProduct || 'IN-IOT工业网关', size: item.size || '12MB', status: item.upgradeStatus || status }
     case 'operationLog':
       return { ...base, user: item.user || item.operator || 'admin', module: item.module || item.moduleName, result: item.result || '成功', time: timeText(item.createdAt) }
-    case 'loginLog':
-      return { ...base, browser: item.browser || 'Chrome', result: item.success === false ? '失败' : '成功', time: timeText(item.createdAt) }
     case 'aiAgent':
       return { ...base, title: item.name, scenario: item.scenario || item.remark || '平台智能辅助', description: item.description || item.remark || '面向工业物联网智能平台运行场景提供建议', model: item.modelName || '平台默认模型', enabled: item.enabled ?? status !== 'DISABLED' }
     default:
@@ -154,11 +158,15 @@ const adaptList = (kind, payload) => {
     return payload.map((item) => {
       let body = {}
       try { body = item.payload ? JSON.parse(item.payload) : {} } catch (error) { body = {} }
+      const metaKeys = new Set(['deviceId', 'deviceKey', 'deviceCode', 'timestamp', 'time'])
       const metrics = telemetryMetrics.map((metric) => {
         const value = item[metric.value] ?? body[metric.value]
         return value !== null && value !== undefined ? { metric: metric.value, label: metric.label, value, unit: metric.unit } : null
       }).filter(Boolean)
-      return { ...item, metrics, metricValues: Object.fromEntries(metrics.map((metric) => [metric.metric, metric.value])), time: timeText(item.reportTime) }
+      Object.entries(body).forEach(([key, value]) => {
+        if (!metaKeys.has(key) && !metrics.some((metric) => metric.metric === key) && value !== null && value !== undefined) metrics.push({ metric: key, label: key, value, unit: '' })
+      })
+      return { ...item, metrics, metricValues: Object.fromEntries(metrics.map((metric) => [metric.metric, metric.value])), dataStatus: item.dataStatus, dataMessage: item.dataMessage, time: timeText(item.reportTime) }
     })
   }
   if (kind === 'historicalAlarm' && Array.isArray(payload)) {
@@ -218,12 +226,6 @@ export const alarmApi = {
 
 export const userApi = {
   changePassword: (payload) => http.post('/users/password', payload)
-}
-
-export const taskApi = {
-  logs: (params) => http.get('/tasks/logs', { params }),
-  start: (id) => http.post(`/tasks/${id}/start`),
-  stop: (id) => http.post(`/tasks/${id}/stop`)
 }
 
 export const aiAgentApi = {

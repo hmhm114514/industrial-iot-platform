@@ -65,8 +65,8 @@
           </el-select>
 
           <label>数据指标</label>
-          <el-select v-model="selectedWidget.metric" placeholder="请选择指标">
-            <el-option v-for="metric in telemetryMetrics" :key="metric.value" :label="metric.label" :value="metric.value" />
+          <el-select v-model="selectedWidget.metric" :disabled="!selectedWidget.deviceId" placeholder="请选择指标">
+            <el-option v-for="metric in deviceMetrics(selectedWidget.deviceId)" :key="metric.value" :label="metric.label" :value="metric.value" />
           </el-select>
 
           <label>可视化方式</label>
@@ -107,11 +107,14 @@ import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
 import { Check, CirclePlus, DataLine, Delete, Histogram, Odometer, Refresh, Setting, TrendCharts } from '@element-plus/icons-vue'
 import { ElMessage } from 'element-plus'
 import ScreenTelemetryWidget from '../components/ScreenTelemetryWidget.vue'
-import { resourceApi, telemetryMetrics } from '../api/platform'
+import { resourceApi } from '../api/platform'
 import { quietError } from '../api/http'
+import { normalizeList } from '../utils/data'
 
 const screens = ref([])
 const devices = ref([])
+const deviceGroups = ref([])
+const deviceAttributes = ref([])
 const telemetryRows = ref([])
 const widgets = ref([])
 const legacyWidgets = ref([])
@@ -137,6 +140,7 @@ const parseScreen = (screen) => {
   try { config = JSON.parse(screen?.configJson || '{}') } catch { config = {} }
   const all = Array.isArray(config.widgets) ? config.widgets : []
   widgets.value = all.filter((widget) => widget?.type === 'device-telemetry').map(normalizeWidget)
+  widgets.value.forEach(ensureWidgetMetric)
   legacyWidgets.value = all.filter((widget) => widget?.type !== 'device-telemetry')
   selectedWidgetId.value = widgets.value[0]?.id || null
 }
@@ -144,23 +148,48 @@ const parseScreen = (screen) => {
 const normalizeWidget = (widget) => ({
   id: widget.id || `telemetry-${Date.now()}`,
   type: 'device-telemetry', title: widget.title || '设备实时数据', deviceId: widget.deviceId || '',
-  metric: widget.metric || 'temperature', chartType: widget.chartType || 'line', limit: Number(widget.limit || 20),
+  metric: widget.metric || '', chartType: widget.chartType || 'line', limit: Number(widget.limit || 20),
   color: widget.color || colors[0], min: Number(widget.min || 0), max: Number(widget.max || 100)
 })
 
 const selectScreen = (id) => parseScreen(screens.value.find((screen) => String(screen.id) === String(id)))
 const deviceName = (id) => devices.value.find((device) => String(device.id) === String(id))?.name || '未选择设备'
-const metricMeta = (value) => telemetryMetrics.find((metric) => metric.value === value) || { label: value || '设备指标', unit: '' }
+const unitByType = (type) => ({ INT: '', FLOAT: '', BOOL: '', STRING: '' }[type] || '')
+const deviceMetrics = (deviceId) => {
+  const device = devices.value.find((item) => String(item.id) === String(deviceId))
+  const group = deviceGroups.value.find((item) => String(item.id) === String(device?.groupId))
+  const ids = String(group?.attributeIds || '').split(',').map((item) => item.trim()).filter(Boolean)
+  if (!ids.length) return []
+  return ids.map((id) => deviceAttributes.value.find((attr) => String(attr.id) === String(id))).filter(Boolean).map((attr) => ({
+    label: attr.name,
+    value: attr.name,
+    unit: unitByType(attr.valueType)
+  }))
+}
+const metricMeta = (value) => deviceAttributes.value.find((attr) => attr.name === value)
+  ? { label: value, unit: unitByType(deviceAttributes.value.find((attr) => attr.name === value)?.valueType) }
+  : { label: value || '设备指标', unit: '' }
+const ensureWidgetMetric = (widget) => {
+  if (!widget?.deviceId) return
+  const options = deviceMetrics(widget.deviceId)
+  if (!options.some((metric) => metric.value === widget.metric)) widget.metric = options[0]?.value || ''
+}
 
 const loadData = async () => {
   loading.value = true
   try {
-    const [screenRows, deviceRows, telemetry] = await Promise.all([
-      resourceApi.list('screen'), resourceApi.list('device'), resourceApi.list('historicalData')
+    const [screenRows, deviceRows, groupRows, attributeRows, telemetry] = await Promise.all([
+      resourceApi.list('screen'),
+      resourceApi.list('device'),
+      resourceApi.list('deviceGroup'),
+      resourceApi.list('deviceAttribute'),
+      resourceApi.list('historicalData', { page: 1, size: 100 })
     ])
-    screens.value = Array.isArray(screenRows) ? screenRows : []
-    devices.value = Array.isArray(deviceRows) ? deviceRows : []
-    telemetryRows.value = Array.isArray(telemetry) ? telemetry : []
+    screens.value = normalizeList(screenRows)
+    devices.value = normalizeList(deviceRows)
+    deviceGroups.value = normalizeList(groupRows)
+    deviceAttributes.value = normalizeList(attributeRows)
+    telemetryRows.value = normalizeList(telemetry)
     const nextId = screens.value.some((item) => String(item.id) === String(selectedScreenId.value))
       ? selectedScreenId.value : screens.value[0]?.id
     selectedScreenId.value = nextId || null
@@ -176,9 +205,9 @@ const realtimeRow = (payload = {}) => {
   const telemetry = payload.telemetry || {}
   let body = {}
   try { body = telemetry.payload ? JSON.parse(telemetry.payload) : {} } catch { body = {} }
-  const metricValues = Object.fromEntries(telemetryMetrics.map((metric) => [
-    metric.value, telemetry[metric.value] ?? body[metric.value]
-  ]).filter(([, value]) => value !== null && value !== undefined))
+  const metaKeys = new Set(['id', 'deviceId', 'deviceName', 'deviceKey', 'deviceCode', 'payload', 'reportTime', 'timestamp', 'time', 'dataStatus', 'dataMessage'])
+  const metricValues = Object.fromEntries(Object.entries({ ...body, ...telemetry })
+    .filter(([key, value]) => !metaKeys.has(key) && value !== null && value !== undefined && typeof value !== 'object'))
   return {
     ...telemetry,
     deviceId: telemetry.deviceId ?? payload.deviceId,
@@ -190,9 +219,10 @@ const realtimeRow = (payload = {}) => {
 
 const addWidget = () => {
   const firstDevice = devices.value[0]
+  const firstMetric = firstDevice ? deviceMetrics(firstDevice.id)[0] : null
   const widget = normalizeWidget({
     id: `telemetry-${Date.now()}-${Math.random().toString(16).slice(2, 6)}`,
-    deviceId: firstDevice?.id || '', title: firstDevice ? `${firstDevice.name}温度` : '设备实时数据'
+    deviceId: firstDevice?.id || '', metric: firstMetric?.value || '', title: firstDevice ? `${firstDevice.name}${firstMetric?.label || ''}` : '设备实时数据'
   })
   widgets.value.push(widget)
   selectedWidgetId.value = widget.id
@@ -200,7 +230,9 @@ const addWidget = () => {
 
 const handleDeviceChange = (id) => {
   const device = devices.value.find((item) => String(item.id) === String(id))
-  if (device && selectedWidget.value) selectedWidget.value.title = `${device.name}${metricMeta(selectedWidget.value.metric).label.split(' ')[0]}`
+  if (!selectedWidget.value) return
+  ensureWidgetMetric(selectedWidget.value)
+  if (device) selectedWidget.value.title = `${device.name}${metricMeta(selectedWidget.value.metric).label}`
 }
 
 const removeWidget = () => {
@@ -226,10 +258,15 @@ const saveLayout = async () => {
       })
     } else {
       const created = await resourceApi.create('screen', { name: '设备数据可视化大屏', groupName: '默认分组', status: 'DRAFT', published: false, configJson })
-      selectedScreenId.value = created?.id
+      selectedScreenId.value = created?.id || selectedScreenId.value
     }
     ElMessage.success('大屏配置已保存')
+    const keepId = selectedScreenId.value
     await loadData()
+    if (keepId && screens.value.some((screen) => String(screen.id) === String(keepId))) {
+      selectedScreenId.value = keepId
+      selectScreen(keepId)
+    }
   } catch (error) {
     quietError(error, '大屏配置保存失败')
   } finally {

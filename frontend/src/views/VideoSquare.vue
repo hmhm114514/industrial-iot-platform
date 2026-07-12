@@ -4,7 +4,6 @@
       <div class="camera-hero-copy">
         <span class="camera-eyebrow">视频中心 · 当前工作站</span>
         <h1>监控查看</h1>
-        <p>按已登记的工业监控档案连接当前工作站摄像头。实时画面默认只在本地处理，不会自动上传。</p>
       </div>
       <div class="camera-hero-action">
         <span class="camera-status-announcer" role="status" aria-live="polite" aria-atomic="true">当前状态：{{ statusMeta.label }}</span>
@@ -148,28 +147,13 @@
           <div><span>当前监控</span><strong :title="selectedRecord.name">{{ selectedRecord.name }}</strong></div>
           <div><span>监控用途</span><strong :title="selectedRecord.purpose || '未填写'">{{ selectedRecord.purpose || '未填写' }}</strong></div>
           <div><span>安装位置</span><strong :title="selectedRecord.location || '未填写'">{{ selectedRecord.location || '未填写' }}</strong></div>
-          <div><span>画质策略</span><strong>自动最佳画质</strong></div>
           <div><span>实际画面</span><strong>{{ cameraState.stream ? streamMetrics : '连接后显示' }}</strong></div>
+          <div><span>安全环境</span><strong>{{ secureContext ? '已满足' : '需要 HTTPS 或 localhost' }}</strong></div>
+          <div><span>画质策略</span><strong>自动最佳</strong></div>
+          <div><span>最长录像</span><strong>单次 5 分钟</strong></div>
         </div>
 
         <div v-if="!recordingSupported" class="recording-support-note">当前浏览器不支持本地录像；实时预览、截图和全屏仍可使用。</div>
-      </aside>
-    </main>
-
-    <section class="camera-bottom-row">
-      <div class="privacy-panel">
-        <div class="privacy-mark" aria-hidden="true">私</div>
-        <div>
-          <span>隐私与运行说明</span>
-          <h3>档案由平台管理，实时媒体留在当前工作站</h3>
-          <p>平台只保存监控名称、用途、位置和摄像头绑定信息。实时预览、截图和录像在当前浏览器内完成，文件不会自动上传。</p>
-        </div>
-        <dl>
-          <div><dt>安全环境</dt><dd>{{ secureContext ? '已满足' : '需要 HTTPS 或 localhost' }}</dd></div>
-          <div><dt>画质策略</dt><dd>自动最佳</dd></div>
-          <div><dt>最长录像</dt><dd>单次 5 分钟</dd></div>
-        </dl>
-      </div>
 
       <div class="recording-result-panel" :class="{ ready: cameraState.recordingResult }" role="status" aria-live="polite">
         <div class="result-icon" aria-hidden="true">↓</div>
@@ -182,7 +166,6 @@
           </template>
           <template v-else>
             <h3>暂无可下载录像</h3>
-            <p>停止本地录像后，文件会显示在这里。</p>
           </template>
         </div>
         <div class="result-actions">
@@ -190,7 +173,8 @@
           <el-button v-if="cameraState.recordingResult" text @click="clearLatestRecording">清除</el-button>
         </div>
       </div>
-    </section>
+      </aside>
+    </main>
   </div>
 </template>
 
@@ -198,6 +182,7 @@
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
+import { resourceApi } from '../api/platform'
 import { monitorDeviceApi } from '../api/video'
 import { createCameraController, normalizeVideoDevices, stopMediaStream } from '../utils/camera'
 import { getOrCreateMonitorClientId } from '../utils/monitorClient'
@@ -209,6 +194,20 @@ const secureContext = window.isSecureContext
 const cameraSupported = Boolean(navigator.mediaDevices?.getUserMedia && navigator.mediaDevices?.enumerateDevices)
 const recordingSupported = Boolean(window.MediaRecorder)
 const environmentReady = secureContext && cameraSupported
+const currentOperator = () => {
+  try {
+    const user = JSON.parse(localStorage.getItem('iot_user') || '{}')
+    return user.realName || user.username || 'admin'
+  } catch (error) {
+    return 'admin'
+  }
+}
+const writeOperationLog = (action, detail) => resourceApi.create('operationLog', {
+  moduleName: '视频中心',
+  action,
+  operator: currentOperator(),
+  detail
+}).catch(() => {})
 
 const controller = createCameraController({
   mediaDevices: navigator.mediaDevices,
@@ -513,6 +512,7 @@ const connectMonitor = async () => {
   detectionMessage.value = ''
   try {
     await controller.connect(record.browserDeviceId)
+    await writeOperationLog('连接摄像头', `${record.name || '本机摄像头'}：${record.location || record.purpose || '实时监控'}`)
   } catch (error) {
     const message = cameraErrorMessage(error)
     if (['NotFoundError', 'OverconstrainedError', 'ConstraintNotSatisfiedError'].includes(error?.name)) {

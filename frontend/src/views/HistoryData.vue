@@ -51,6 +51,7 @@
             <span><i class="low" />低</span>
             <span><i class="middle" />中</span>
             <span><i class="high" />高</span>
+            <span><i class="abnormal" />数据异常</span>
           </div>
         </aside>
         <section class="history-main">
@@ -71,13 +72,14 @@
             </el-table-column>
             <el-table-column prop="time" column-key="reportTime" label="上报时间" width="180" sortable="custom" />
             <el-table-column prop="deviceName" label="设备名称" min-width="190" sortable="custom" />
-            <el-table-column prop="ruleName" label="规则名称" min-width="180" />
+            <el-table-column prop="ruleName" label="规则名称" min-width="200" />
             <el-table-column label="详情" width="100" align="center" fixed="right">
               <template #default="{ row }"><el-button link type="primary" @click="openDetail(row)">查看</el-button></template>
             </el-table-column>
           </el-table>
           <div class="table-pagination">
-            <el-pagination v-model:current-page="page.current" v-model:page-size="page.size" :page-sizes="[10, 20, 50]" layout="total, sizes, prev, pager, next" :total="total" />
+            <span class="pagination-total">共 {{ pageCount }} 页</span>
+            <el-pagination v-model:current-page="page.current" v-model:page-size="page.size" :page-sizes="[10, 20, 50]" layout="sizes, prev, pager, next" :total="total" />
           </div>
         </section>
       </div>
@@ -90,6 +92,7 @@
         <el-table-column prop="unit" label="单位" width="100" />
         <el-table-column prop="label" label="说明" min-width="160" />
       </el-table>
+      <el-alert v-if="currentDetail?.dataMessage" class="data-error-alert" type="error" :title="currentDetail.dataMessage" show-icon :closable="false" />
     </el-dialog>
   </div>
 </template>
@@ -103,7 +106,7 @@ import { clone, normalizeList } from '../utils/data'
 
 const rows = ref([])
 const total = ref(0)
-const stats = ref({ alarmSummary: { 正常: 0, 低: 0, 中: 0, 高: 0 } })
+const stats = ref({ alarmSummary: { 正常: 0, 低: 0, 中: 0, 高: 0, 数据异常: 0 } })
 const devices = ref([])
 const products = ref([])
 const productCategories = ref([])
@@ -117,9 +120,10 @@ const currentDetail = ref(null)
 const hoverSegment = ref(null)
 
 const detailTitle = computed(() => currentDetail.value ? `${currentDetail.value.deviceName} - ${currentDetail.value.time}` : '指标详情')
-const alarmSummary = computed(() => ['正常', '低', '中', '高'].map((status) => ({ status, count: Number(stats.value.alarmSummary?.[status] || 0) })))
+const pageCount = computed(() => Math.ceil(total.value / page.size) || 0)
+const alarmSummary = computed(() => ['正常', '低', '中', '高', '数据异常'].map((status) => ({ status, count: Number(stats.value.alarmSummary?.[status] || 0) })))
 const alarmCount = (status) => alarmSummary.value.find((item) => item.status === status)?.count || 0
-const alarmColors = { 正常: '#67c23a', 低: '#f3c96b', 中: '#e6a23c', 高: '#f56c6c' }
+const alarmColors = { 正常: '#67c23a', 低: '#f3c96b', 中: '#e6a23c', 高: '#f56c6c', 数据异常: '#7c3aed' }
 const polar = (angle, radius = 70) => {
   const radians = (angle - 90) * Math.PI / 180
   return { x: 90 + radius * Math.cos(radians), y: 90 + radius * Math.sin(radians) }
@@ -148,30 +152,44 @@ const alarmSegments = computed(() => {
 })
 const hoveredAlarm = computed(() => alarmSegments.value.find((item) => item.status === hoverSegment.value))
 
-const alarmTag = (status) => ({ 高: 'danger', 中: 'warning', 低: 'warning', 正常: 'success' }[status] || 'info')
+const alarmTag = (status) => ({ 高: 'danger', 中: 'warning', 低: 'warning', 正常: 'success', 数据异常: 'danger' }[status] || 'info')
 const levelText = (level) => ({ HIGH: '高', MEDIUM: '中', LOW: '低', INFO: '低', high: '高', medium: '中', low: '低' }[level] || level || '低')
 const levelRank = (level) => ({ 高: 3, 中: 2, 低: 1, 正常: 0 }[level] || 0)
 const compare = (value, operator, threshold) => {
   const left = Number(value)
   const right = Number(threshold)
-  if (Number.isNaN(left) || Number.isNaN(right)) return false
+  if (Number.isNaN(left) || Number.isNaN(right)) {
+    const equal = String(value ?? '').toLowerCase() === String(threshold ?? '').toLowerCase()
+    return operator === '!=' ? !equal : equal
+  }
   if (operator === '>=') return left >= right
   if (operator === '<') return left < right
   if (operator === '<=') return left <= right
   if (operator === '==') return left === right
+  if (operator === '!=') return left !== right
   return left > right
 }
-const alarmStatus = (row) => {
+const ruleHit = (values, rule) => {
+  const first = compare(values?.[rule.metric], rule.operator, rule.threshold)
+  if (!rule.logicOperator) return first
+  const second = compare(values?.[rule.secondMetric], rule.secondOperator, rule.secondThreshold)
+  return rule.logicOperator === 'OR' ? first || second : first && second
+}
+const alarmStatus = (row, ruleIds = []) => {
+  if (row.dataStatus === 'ABNORMAL') return '数据异常'
   const hits = rules.value
     .filter((rule) => rule.enabled !== false && rule.status !== 'DISABLED')
-    .filter((rule) => compare(row.metricValues?.[rule.metric], rule.operator, rule.threshold))
+    .filter((rule) => !ruleIds.length || ruleIds.some((id) => String(id) === String(rule.id)))
+    .filter((rule) => ruleHit(row.metricValues || {}, rule))
     .map((rule) => levelText(rule.alarmLevel || rule.level))
   return hits.sort((a, b) => levelRank(b) - levelRank(a))[0] || '正常'
 }
 const metricStatus = (metric) => {
+  if (currentDetail.value?.dataStatus === 'ABNORMAL') return '数据异常'
+  const values = currentDetail.value?.metricValues || { [metric.metric]: metric.value }
   const hits = rules.value
-    .filter((rule) => rule.enabled !== false && rule.status !== 'DISABLED' && rule.metric === metric.metric)
-    .filter((rule) => compare(metric.value, rule.operator, rule.threshold))
+    .filter((rule) => rule.enabled !== false && rule.status !== 'DISABLED' && (rule.metric === metric.metric || rule.secondMetric === metric.metric))
+    .filter((rule) => ruleHit(values, rule))
     .map((rule) => levelText(rule.alarmLevel || rule.level))
   return hits.sort((a, b) => levelRank(b) - levelRank(a))[0] || '正常'
 }
@@ -179,7 +197,8 @@ const metricRowClass = ({ row }) => ({
   正常: 'metric-row-normal',
   低: 'metric-row-low',
   中: 'metric-row-middle',
-  高: 'metric-row-high'
+  高: 'metric-row-high',
+  数据异常: 'metric-row-abnormal'
 }[metricStatus(row)] || 'metric-row-normal')
 const enrichRows = (items) => items.map((row) => {
   const device = devices.value.find((item) => String(item.id) === String(row.deviceId) || item.name === row.deviceName)
@@ -188,7 +207,7 @@ const enrichRows = (items) => items.map((row) => {
   const group = deviceGroups.value.find((item) => String(item.id) === String(device?.groupId))
   const ruleIds = String(device?.ruleIds || row.ruleIds || product?.ruleIds || device?.ruleId || row.ruleId || product?.ruleId || '').split(',').map((item) => item.trim()).filter(Boolean)
   const ruleName = ruleIds.map((id) => rules.value.find((item) => String(item.id) === String(id))?.name).filter(Boolean).join('，')
-  return { ...row, productGroup: category?.name || product?.category || '-', deviceGroup: group?.name || device?.group || '-', deviceCode: device?.code || row.deviceCode || '-', ruleName: ruleName || product?.ruleChain || '-', alarmStatus: alarmStatus(row) }
+  return { ...row, productGroup: category?.name || product?.category || '-', deviceGroup: group?.name || device?.group || '-', deviceCode: device?.code || row.deviceCode || '-', ruleName: ruleName || product?.ruleChain || '-', alarmStatus: alarmStatus(row, ruleIds) }
 })
 
 const search = async () => { page.current = 1; await load() }
@@ -214,7 +233,7 @@ const load = async () => {
     quietError(error, '数据服务暂不可用，当前为演示数据')
     rows.value = clone(fallbackRows.historicalData).map((row) => ({ ...row, metrics: [{ metric: row.metric, label: row.metric, value: row.value, unit: row.unit }], metricValues: { [row.metric]: row.value }, productGroup: '-', deviceGroup: '-', deviceCode: '-', ruleName: '-', alarmStatus: '正常' }))
     total.value = rows.value.length
-    stats.value = { alarmSummary: { 正常: rows.value.length, 低: 0, 中: 0, 高: 0 } }
+    stats.value = { alarmSummary: { 正常: rows.value.length, 低: 0, 中: 0, 高: 0, 数据异常: 0 } }
   }
 }
 const openDetail = (row) => { currentDetail.value = row; detailVisible.value = true }
@@ -234,3 +253,17 @@ onMounted(() => {
 })
 onBeforeUnmount(() => window.removeEventListener('iot-realtime', handleRealtime))
 </script>
+
+<style scoped>
+.alarm-donut-legend .abnormal {
+  background: #7c3aed;
+}
+
+.data-error-alert {
+  margin-top: 12px;
+}
+
+:deep(.metric-row-abnormal td) {
+  background: rgba(124, 58, 237, .12) !important;
+}
+</style>

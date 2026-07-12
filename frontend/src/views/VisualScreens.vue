@@ -34,18 +34,31 @@
       </div>
 
       <div class="screen-grid dynamic-grid">
-        <div v-for="widget in widgets" :key="widget.id" :class="['screen-panel', widget.span === 2 ? 'wide' : '', widget.tone || '']">
-          <h3>{{ widget.title }}</h3>
-          <strong v-if="widget.type === 'stat'">{{ widget.value }}</strong>
-          <span v-if="widget.subtext">{{ widget.subtext }}</span>
-          <div v-if="widget.type === 'trend'" class="trend-bars">
-            <i v-for="item in widget.items" :key="item.name || item.label || item.date" :style="{ height: `${Math.max(8, Number(item.value || 0) * 10)}px` }"><em>{{ item.name || item.label || item.date }}</em></i>
-          </div>
-          <ul v-if="widget.type === 'list'">
-            <li v-for="item in widget.items" :key="item.label || item.name">
-              <span>{{ item.label || item.name }}</span><b>{{ item.value }}</b>
-            </li>
-          </ul>
+        <div v-for="widget in widgets" :key="widget.id" :class="['screen-panel', widget.type === 'device-telemetry' ? 'telemetry-panel' : '', widget.span === 2 ? 'wide' : '', widget.tone || '']">
+          <ScreenTelemetryWidget
+            v-if="widget.type === 'device-telemetry'"
+            :widget="widget"
+            :rows="telemetryRows"
+            :device-name="deviceName(widget.deviceId)"
+            :metric-label="metricMeta(widget.metric).label"
+            :metric-unit="metricMeta(widget.metric).unit"
+          />
+          <template v-else>
+            <h3>{{ widget.title }}</h3>
+            <strong v-if="widget.type === 'stat'">{{ widget.value }}</strong>
+            <span v-if="widget.subtext">{{ widget.subtext }}</span>
+            <div v-if="widget.type === 'trend'" class="trend-bars">
+              <i v-for="item in widget.items" :key="item.name || item.label || item.date" :style="{ height: item.barHeight }">
+                <b>{{ item.value }}</b>
+                <em>{{ item.name || item.label || item.date }}</em>
+              </i>
+            </div>
+            <ul v-if="widget.type === 'list'">
+              <li v-for="item in widget.items" :key="item.label || item.name">
+                <span>{{ item.label || item.name }}</span><b>{{ item.value }}</b>
+              </li>
+            </ul>
+          </template>
         </div>
       </div>
     </div>
@@ -66,16 +79,19 @@
 </template>
 
 <script setup>
-import { computed, onMounted, reactive, ref } from 'vue'
+import { computed, onBeforeUnmount, onMounted, reactive, ref } from 'vue'
 import { ElMessage } from 'element-plus'
-import { dashboardApi, resourceApi } from '../api/platform'
+import ScreenTelemetryWidget from '../components/ScreenTelemetryWidget.vue'
+import { dashboardApi, resourceApi, telemetryMetrics } from '../api/platform'
 import { quietError } from '../api/http'
+import { normalizeList } from '../utils/data'
 
 const screens = ref([])
 const selectedId = ref(null)
 const currentScreen = ref(null)
 const dashboard = ref({ stats: {}, messageTrend: [], statusRatio: [], alarmTrend: [] })
 const devices = ref([])
+const telemetryRows = ref([])
 const fallbackMode = ref(false)
 const editorVisible = ref(false)
 const saving = ref(false)
@@ -107,30 +123,58 @@ const config = computed(() => {
 })
 
 const widgets = computed(() => config.value.widgets.filter((widget) => widget?.type !== 'topology').map((widget) => buildWidget(widget)))
+const metricMeta = (value) => telemetryMetrics.find((metric) => metric.value === value) || { label: value || '设备指标', unit: '' }
+const deviceName = (id) => devices.value.find((device) => String(device.id) === String(id))?.name || '未选择设备'
 
 const buildWidget = (widget) => {
   if (!widget || typeof widget !== 'object') return { id: String(widget || 'widget'), type: 'stat', title: '设备总数', metric: 'devices', value: 0, subtext: '平台统计' }
+  if (widget.type === 'device-telemetry') {
+    return {
+      id: widget.id || `telemetry-${Date.now()}`,
+      type: 'device-telemetry',
+      title: widget.title || '设备实时数据',
+      deviceId: widget.deviceId || '',
+      metric: widget.metric || 'temperature',
+      chartType: widget.chartType || 'line',
+      limit: Number(widget.limit || 20),
+      color: widget.color || '#35d6ed',
+      min: Number(widget.min || 0),
+      max: Number(widget.max || 100)
+    }
+  }
   const stats = dashboard.value.stats || {}
   if (widget.type === 'stat') {
     const value = Number(stats[widget.metric] || 0).toLocaleString()
     const subtext = widget.metric === 'onlineDevices' ? '实时通信中' : widget.metric === 'alarms' ? '待关注' : '平台统计'
     return { ...widget, value, subtext }
   }
-  if (widget.type === 'trend') return { ...widget, items: dashboard.value[widget.metric] || [] }
+  if (widget.type === 'trend') {
+    const rawItems = dashboard.value[widget.metric] || []
+    const maxValue = Math.max(1, ...rawItems.map((item) => Number(item.value || 0)))
+    return {
+      ...widget,
+      items: rawItems.map((item) => {
+        const value = Number(item.value || 0)
+        return { ...item, value, barHeight: `${Math.max(10, Math.round((value / maxValue) * 118))}px` }
+      })
+    }
+  }
   if (widget.type === 'list') return { ...widget, items: devices.value.slice(0, 5).map((item) => ({ label: item.name, value: item.online ? '在线' : '离线' })) }
   return widget
 }
 
 const load = async () => {
   try {
-    const [screenRows, dash, deviceRows] = await Promise.all([
+    const [screenRows, dash, deviceRows, telemetry] = await Promise.all([
       resourceApi.list('screen'),
       dashboardApi.get(),
-      resourceApi.list('device')
+      resourceApi.list('device'),
+      resourceApi.list('historicalData', { page: 1, size: 100 })
     ])
-    screens.value = Array.isArray(screenRows) ? screenRows : []
+    screens.value = normalizeList(screenRows)
     dashboard.value = dash || dashboard.value
-    devices.value = Array.isArray(deviceRows) ? deviceRows : []
+    devices.value = normalizeList(deviceRows)
+    telemetryRows.value = normalizeList(telemetry)
     fallbackMode.value = false
   } catch (error) {
     quietError(error, '大屏数据服务暂不可用，当前展示本地驾驶舱模板')
@@ -138,9 +182,34 @@ const load = async () => {
     screens.value = [{ id: 'local-screen', name: '智慧工厂运行驾驶舱', groupName: '默认分组', published: false, configJson: JSON.stringify(defaultConfig, null, 2) }]
     dashboard.value = { stats: { devices: 0, onlineDevices: 0, alarms: 0 }, messageTrend: [] }
     devices.value = []
+    telemetryRows.value = []
   }
   const next = screens.value.find((item) => item.published) || screens.value[0]
   if (next) selectScreen(next.id)
+}
+
+const realtimeRow = (payload = {}) => {
+  const telemetry = payload.telemetry || {}
+  let body = {}
+  try { body = telemetry.payload ? JSON.parse(telemetry.payload) : {} } catch { body = {} }
+  const metricValues = Object.fromEntries(telemetryMetrics.map((metric) => [
+    metric.value, telemetry[metric.value] ?? body[metric.value]
+  ]).filter(([, value]) => value !== null && value !== undefined))
+  return {
+    ...telemetry,
+    deviceId: telemetry.deviceId ?? payload.deviceId,
+    deviceName: telemetry.deviceName ?? payload.deviceName,
+    metricValues,
+    time: String(telemetry.reportTime || new Date().toISOString()).replace('T', ' ').slice(0, 19)
+  }
+}
+
+const handleRealtime = (event) => {
+  if (event.detail?.type !== 'telemetry') return
+  const payload = event.detail?.payload || {}
+  if (!widgets.value.some((widget) => widget.type === 'device-telemetry' && String(widget.deviceId) === String(payload.deviceId))) return
+  const row = realtimeRow(payload)
+  telemetryRows.value = [row, ...telemetryRows.value.filter((item) => String(item.id) !== String(row.id))]
 }
 
 const selectScreen = (id) => {
@@ -191,7 +260,11 @@ const publishScreen = async () => {
   }
 }
 
-onMounted(load)
+onMounted(() => {
+  load()
+  window.addEventListener('iot-realtime', handleRealtime)
+})
+onBeforeUnmount(() => window.removeEventListener('iot-realtime', handleRealtime))
 </script>
 
 <style scoped>
@@ -199,10 +272,13 @@ onMounted(load)
 .screen-toolbar div { display: flex; flex-direction: column; gap: 4px; }
 .screen-toolbar span { color: #7db9ff; font-size: 13px; }
 .screen-toolbar strong { color: #fff; font-size: 22px; }
-.trend-bars { display: flex; align-items: end; gap: 10px; height: 150px; padding-top: 14px; }
-.trend-bars i { flex: 1; min-width: 18px; border-radius: 10px 10px 4px 4px; background: linear-gradient(180deg, #38e1ff, #1277ff); position: relative; box-shadow: 0 0 16px rgba(56, 225, 255, .28); }
-.trend-bars em { position: absolute; left: 50%; bottom: -26px; transform: translateX(-50%); color: #8fb4db; font-size: 12px; font-style: normal; white-space: nowrap; }
+.trend-bars { display: flex; align-items: end; gap: 10px; height: 150px; padding: 24px 0 24px; overflow: hidden; }
+.trend-bars i { flex: 1; min-width: 18px; max-height: 118px; border-radius: 10px 10px 4px 4px; background: linear-gradient(180deg, #38e1ff, #1277ff); position: relative; box-shadow: 0 0 16px rgba(56, 225, 255, .28); }
+.trend-bars b { position: absolute; left: 50%; top: -20px; transform: translateX(-50%); color: #dff8ff; font-size: 11px; }
+.trend-bars em { position: absolute; left: 50%; bottom: -22px; transform: translateX(-50%); color: #8fb4db; font-size: 12px; font-style: normal; white-space: nowrap; }
 .screen-panel ul { list-style: none; margin: 0; padding: 0; display: grid; gap: 10px; }
 .screen-panel li { display: flex; justify-content: space-between; gap: 12px; padding: 10px 12px; border-radius: 12px; background: rgba(255, 255, 255, .05); }
 .screen-panel li b { color: #fff; }
+.screen-panel.telemetry-panel { padding: 0; background: transparent; border: 0; box-shadow: none; }
+.screen-panel.telemetry-panel :deep(.telemetry-widget) { height: 100%; min-height: 330px; }
 </style>

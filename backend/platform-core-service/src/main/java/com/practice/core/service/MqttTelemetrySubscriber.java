@@ -89,8 +89,6 @@ public class MqttTelemetrySubscriber {
             Map<String, Object> payload = mapper.readValue(text, new TypeReference<>() {});
             String topicDeviceKey = deviceKeyFromTopic(messageTopic);
             if (!topicDeviceKey.isBlank() && !payload.containsKey("deviceKey")) payload.put("deviceKey", topicDeviceKey);
-            payload.putIfAbsent("source", "mqtt");
-            payload.put("mqttTopic", messageTopic);
             Map<String, Object> result = service.report(payload);
             Object telemetry = result.get("telemetry");
             Object alarms = result.get("alarms");

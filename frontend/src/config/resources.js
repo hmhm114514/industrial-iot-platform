@@ -4,8 +4,34 @@ const enabledColumn = { prop: 'enabled', label: '启停', type: 'switch', width:
 const textField = (prop, label, extra = {}) => ({ prop, label, type: 'text', ...extra })
 const selectField = (prop, label, options = [], extra = {}) => ({ prop, label, type: 'select', options, ...extra })
 const numberField = (prop, label, extra = {}) => ({ prop, label, type: 'number', ...extra })
+const checkboxField = (prop, label, extra = {}) => ({ prop, label, type: 'checkbox', ...extra })
 
 export const resourceConfigs = {
+  deviceAttribute: {
+    title: '设备属性',
+    accent: '属性',
+    searchable: '属性名 / 类型',
+    columns: [
+      { prop: 'name', label: '属性名', minWidth: 160 },
+      { prop: 'valueTypeText', label: '属性类型', width: 120 },
+      { prop: 'range', label: '数据范围', width: 140 },
+      { prop: 'remark', label: '说明', minWidth: 180 },
+      statusColumn,
+      { prop: 'createdAt', label: '创建时间', width: 180 }
+    ],
+    fields: [
+      textField('name', '属性名', { required: true }),
+      selectField('valueType', '属性类型', [
+        { label: 'bool类型', value: 'BOOL' },
+        { label: '整型', value: 'INT' },
+        { label: '浮点型', value: 'FLOAT' },
+        { label: '字符型', value: 'STRING' }
+      ], { required: true, optionLabel: 'label', optionValue: 'value' }),
+      numberField('minValue', '最小值', { nullable: true, enableProp: 'minEnabled', visibleWhen: { prop: 'valueType', values: ['INT', 'FLOAT'] } }),
+      numberField('maxValue', '最大值', { nullable: true, enableProp: 'maxEnabled', visibleWhen: { prop: 'valueType', values: ['INT', 'FLOAT'] } }),
+      textField('remark', '说明')
+    ]
+  },
   productCategory: {
     title: '产品分类',
     accent: '分类',
@@ -24,10 +50,10 @@ export const resourceConfigs = {
     accent: '产品',
     searchable: '产品名称 / 编码',
     columns: [
-      { prop: 'name', label: '产品名称', minWidth: 190 },
+      { prop: 'name', label: '产品名称', minWidth: 150 },
       { prop: 'code', label: '产品编码', width: 140 },
       { prop: 'category', label: '所属分类', width: 130 },
-      { prop: 'ruleChain', label: '规则链', minWidth: 170 },
+      { prop: 'ruleChain', label: '规则链', minWidth: 300 },
       { prop: 'protocol', label: '接入协议', width: 110, type: 'tag' },
       { prop: 'deviceCount', label: '设备数', width: 90 },
       statusColumn,
@@ -51,10 +77,18 @@ export const resourceConfigs = {
       { prop: 'code', label: '编码', width: 130 },
       { prop: 'location', label: '位置', minWidth: 160 },
       { prop: 'owner', label: '负责人', width: 120 },
+      { prop: 'attributeNames', label: '设备属性', minWidth: 220 },
       { prop: 'deviceCount', label: '设备数', width: 90 },
       statusColumn
     ],
-    fields: [textField('name', '分组名称', { required: true }), textField('code', '编码', { required: true }), textField('location', '位置', { required: true }), textField('owner', '负责人', { required: true }), numberField('deviceCount', '设备数', { required: true })]
+    fields: [
+      textField('name', '分组名称', { required: true }),
+      textField('code', '编码', { required: true }),
+      textField('location', '位置', { required: true }),
+      textField('owner', '负责人', { required: true }),
+      selectField('attributeIds', '设备属性', [], { required: true, multiple: true, source: 'deviceAttribute', optionLabel: 'name', optionValue: 'id' }),
+      numberField('deviceCount', '设备数', { required: true })
+    ]
   },
   device: {
     title: '设备管理',
@@ -90,10 +124,10 @@ export const resourceConfigs = {
     accent: '服务',
     columns: [
       { prop: 'name', label: '服务名称', minWidth: 180 },
-      { prop: 'type', label: '类型', type: 'tag', width: 100 },
-      { prop: 'port', label: '服务通道', width: 110 },
-      { prop: 'uplink', label: '上行速率', width: 130 },
-      { prop: 'downlink', label: '下行速率', width: 130 },
+      { prop: 'type', label: '类型', type: 'tag', width: 200 },
+      { prop: 'port', label: '服务通道', width: 400 },
+      { prop: 'uplink', label: '上行速率', width: 200 },
+      { prop: 'downlink', label: '下行速率', width: 200 },
       { prop: 'status', label: '运行状态', type: 'health', width: 110 },
       enabledColumn
     ],
@@ -223,17 +257,6 @@ export const resourceConfigs = {
     ],
     fields: []
   },
-  taskLog: {
-    title: '任务日志',
-    readonly: true,
-    columns: [
-      { prop: 'taskName', label: '任务名称', minWidth: 180 },
-      { prop: 'status', label: '结果', type: 'alarm', width: 100 },
-      { prop: 'message', label: '执行信息', minWidth: 260 },
-      { prop: 'time', label: '时间', width: 180 }
-    ],
-    fields: []
-  },
   user: {
     title: '用户管理',
     accent: '用户',
@@ -280,23 +303,11 @@ export const resourceConfigs = {
     title: '操作日志',
     readonly: true,
     columns: [
-      { prop: 'user', label: '用户', width: 110 },
-      { prop: 'module', label: '模块', width: 130 },
+      { prop: 'user', label: '用户', width: 140 },
+      { prop: 'module', label: '模块', width: 150 },
       { prop: 'action', label: '操作', width: 140 },
-      { prop: 'ip', label: '来源终端', width: 130 },
-      { prop: 'result', label: '结果', type: 'alarm', width: 90 },
-      { prop: 'time', label: '时间', width: 180 }
-    ],
-    fields: []
-  },
-  loginLog: {
-    title: '登录日志',
-    readonly: true,
-    columns: [
-      { prop: 'username', label: '账号', width: 130 },
-      { prop: 'ip', label: '来源终端', width: 130 },
-      { prop: 'browser', label: '浏览器', width: 120 },
-      { prop: 'result', label: '结果', type: 'alarm', width: 90 },
+      { prop: 'detail', label: '详情', minWidth: 260 },
+      { prop: 'result', label: '结果', type: 'alarm', width: 100 },
       { prop: 'time', label: '时间', width: 180 }
     ],
     fields: []

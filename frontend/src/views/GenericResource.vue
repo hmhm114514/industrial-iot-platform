@@ -6,8 +6,8 @@
         <h1>{{ cfg.title }}</h1>
       </div>
       <div class="module-actions">
-        <el-input v-model="keyword" :placeholder="cfg.searchable || '输入关键字搜索'" clearable class="search-input" @keyup.enter="load" />
-        <el-button @click="load">查询</el-button>
+        <el-input v-model="keyword" :placeholder="cfg.searchable || '输入关键字搜索'" clearable class="search-input" @keyup.enter="search" />
+        <el-button @click="search">查询</el-button>
         <el-button v-if="!cfg.readonly" type="primary" @click="openCreate">新增{{ cfg.accent || '' }}</el-button>
       </div>
     </section>
@@ -38,34 +38,52 @@
       </div>
     </div>
 
-    <el-card v-else class="table-card" shadow="never">
-      <el-table v-loading="loading" :data="filteredRows" stripe>
-        <el-table-column type="index" width="56" label="#" />
-        <el-table-column v-for="col in cfg.columns" :key="col.prop" v-bind="col">
-          <template #default="{ row }">
-            <StatusTag v-if="['status', 'tag', 'health', 'online', 'alarm'].includes(col.type)" :value="row[col.prop]" :mode="col.type" />
-            <el-switch v-else-if="col.type === 'switch'" v-model="row[col.prop]" @change="toggleRow(row, col.prop)" />
-            <span v-else>{{ row[col.prop] ?? '-' }}</span>
-          </template>
-        </el-table-column>
-        <el-table-column v-if="!cfg.readonly" label="操作" fixed="right" width="230">
-          <template #default="{ row }">
-            <el-button v-if="kind === 'device'" link type="primary" @click="openView(row)">查看</el-button>
-            <el-button link type="primary" @click="openEdit(row)">编辑</el-button>
-            <el-button v-if="kind === 'device'" link type="success" @click="openSimulate(row)">模拟上报</el-button>
-            <el-button link type="danger" @click="removeRow(row)">删除</el-button>
-          </template>
-        </el-table-column>
-      </el-table>
-    </el-card>
+    <el-row v-else :gutter="18" class="resource-table-row">
+      <el-col v-if="kind === 'operationLog'" :xs="24" :lg="7">
+        <el-card class="operation-stat-card" shadow="never">
+          <div ref="operationRuleChartRef" class="chart operation-action-chart" />
+        </el-card>
+      </el-col>
+      <el-col :xs="24" :lg="kind === 'operationLog' ? 17 : 24">
+        <el-card class="table-card" shadow="never">
+          <el-table v-loading="loading" :data="filteredRows" stripe>
+            <el-table-column type="index" width="56" label="#" :index="indexMethod" />
+            <el-table-column v-for="col in cfg.columns" :key="col.prop" v-bind="col">
+              <template #default="{ row }">
+                <StatusTag v-if="['status', 'tag', 'health', 'online', 'alarm'].includes(col.type)" :value="row[col.prop]" :mode="col.type" />
+                <el-switch v-else-if="col.type === 'switch'" v-model="row[col.prop]" @change="toggleRow(row, col.prop)" />
+                <span v-else>{{ row[col.prop] ?? '-' }}</span>
+              </template>
+            </el-table-column>
+            <el-table-column v-if="!cfg.readonly" label="操作" fixed="right" width="230">
+              <template #default="{ row }">
+                <el-button v-if="kind === 'device'" link type="primary" @click="openView(row)">查看</el-button>
+                <el-button link type="primary" @click="openEdit(row)">编辑</el-button>
+                <el-button v-if="kind === 'device'" link type="success" @click="openSimulate(row)">模拟上报</el-button>
+                <el-button link type="danger" @click="removeRow(row)">删除</el-button>
+              </template>
+            </el-table-column>
+          </el-table>
+          <div v-if="pagedResource" class="table-pagination">
+            <span class="pagination-total">共 {{ pageCount }} 页</span>
+            <el-pagination v-model:current-page="page.current" v-model:page-size="page.size" :page-sizes="[10, 20, 50]" layout="sizes, prev, pager, next" :total="total" />
+          </div>
+        </el-card>
+      </el-col>
+    </el-row>
 
     <el-dialog v-model="dialogVisible" :title="dialogTitle" width="560px" destroy-on-close>
       <el-form ref="formRef" :model="form" :rules="formRules" label-width="96px">
-        <el-form-item v-for="field in cfg.fields" :key="field.prop" :label="field.label" :prop="field.prop">
+        <el-form-item v-for="field in visibleFields" :key="field.prop" :label="field.label" :prop="field.prop">
           <el-select v-if="field.type === 'select'" v-model="form[field.prop]" class="full" placeholder="请选择" :multiple="field.multiple" collapse-tags collapse-tags-tooltip>
             <el-option v-for="item in fieldOptions(field)" :key="optionValue(item, field)" :label="optionLabel(item, field)" :value="optionValue(item, field)" />
           </el-select>
-          <el-input-number v-else-if="field.type === 'number'" v-model="form[field.prop]" class="full" :min="field.min ?? 0" :max="field.max" />
+          <div v-else-if="field.type === 'number' && field.enableProp" class="range-limit-field">
+            <el-checkbox v-model="form[field.enableProp]" />
+            <el-input-number v-model="form[field.prop]" class="full" :disabled="!form[field.enableProp]" :min="field.min" :max="field.max" :precision="field.precision" />
+          </div>
+          <el-input-number v-else-if="field.type === 'number'" v-model="form[field.prop]" class="full" :min="field.min" :max="field.max" :precision="field.precision" />
+          <el-checkbox v-else-if="field.type === 'checkbox'" v-model="form[field.prop]">{{ field.text || field.label }}</el-checkbox>
           <el-input v-else v-model="form[field.prop]" :type="field.type === 'password' ? 'password' : 'text'" :show-password="field.type === 'password'" :placeholder="field.placeholder || `请输入${field.label}`" />
         </el-form-item>
       </el-form>
@@ -105,8 +123,9 @@
 </template>
 
 <script setup>
-import { computed, defineComponent, h, onMounted, reactive, ref, watch } from 'vue'
+import { computed, defineComponent, h, nextTick, onBeforeUnmount, onMounted, reactive, ref, watch } from 'vue'
 import { useRoute } from 'vue-router'
+import * as echarts from 'echarts'
 import { ElMessage, ElMessageBox, ElTag } from 'element-plus'
 import { resourceApi, telemetryApi } from '../api/platform'
 import { quietError } from '../api/http'
@@ -137,6 +156,8 @@ const cfg = computed(() => resourceConfigs[kind.value] || resourceConfigs.devToo
 const rows = ref([])
 const optionSources = ref({})
 const keyword = ref('')
+const total = ref(0)
+const page = reactive({ current: 1, size: 20 })
 const loading = ref(false)
 const saving = ref(false)
 const dialogVisible = ref(false)
@@ -145,17 +166,29 @@ const detailVisible = ref(false)
 const editingId = ref(null)
 const currentDetail = ref(null)
 const formRef = ref(null)
+const operationRuleChartRef = ref(null)
 const form = reactive({})
 const simulateForm = reactive({ deviceCode: '', deviceName: '', temperature: 36, humidity: 55 })
+const operationActionStats = ref([])
+let operationRuleChart
 
 const dialogTitle = computed(() => `${editingId.value ? '编辑' : '新增'}${cfg.value.accent || cfg.value.title}`)
 const detailTitle = computed(() => currentDetail.value ? `设备详情 - ${currentDetail.value.name || currentDetail.value.code}` : '设备详情')
+const pagedResource = computed(() => ['operationLog', 'ruleAudit'].includes(kind.value))
+const pageCount = computed(() => Math.ceil(total.value / page.size) || 0)
+const indexMethod = (index) => pagedResource.value ? (page.current - 1) * page.size + index + 1 : index + 1
 const filteredRows = computed(() => {
   const key = keyword.value.trim().toLowerCase()
   if (!key) return rows.value
   return rows.value.filter((row) => JSON.stringify(row).toLowerCase().includes(key))
 })
-const formRules = computed(() => Object.fromEntries(cfg.value.fields.filter((field) => field.required).map((field) => [field.prop, [{ required: true, message: `请选择或输入${field.label}`, trigger: field.type === 'select' ? 'change' : 'blur' }]])))
+const fieldVisible = (field) => {
+  if (!field.visibleWhen) return true
+  const conditions = Array.isArray(field.visibleWhen) ? field.visibleWhen : [field.visibleWhen]
+  return conditions.every((condition) => condition.values.map(String).includes(String(form[condition.prop])))
+}
+const visibleFields = computed(() => cfg.value.fields.filter(fieldVisible))
+const formRules = computed(() => Object.fromEntries(visibleFields.value.filter((field) => field.required).map((field) => [field.prop, [{ required: true, message: `请选择或输入${field.label}`, trigger: field.type === 'select' ? 'change' : 'blur' }]])))
 
 const fallback = () => clone(fallbackRows[kind.value] || fallbackExtra[kind.value] || [])
 const optionLabel = (item, field) => item && typeof item === 'object' ? item[field.optionLabel || 'label'] ?? item.name ?? item.label : item
@@ -232,6 +265,7 @@ const loadOptions = async () => {
 }
 
 const withOptionLabels = (items) => {
+  const attributes = optionSources.value.deviceAttribute || []
   const categories = optionSources.value.productCategory || []
   const rules = optionSources.value.rule || []
   const products = optionSources.value.product || []
@@ -242,6 +276,12 @@ const withOptionLabels = (items) => {
       product: products.find((product) => String(product.id) === String(item.productId))?.name || item.product,
       productProtocol: products.find((product) => String(product.id) === String(item.productId))?.protocol,
       group: groups.find((group) => String(group.id) === String(item.groupId))?.name || item.group
+    }))
+  }
+  if (kind.value === 'deviceGroup') {
+    return items.map((item) => ({
+      ...item,
+      attributeNames: parseMultiValue(item.attributeIds).map((id) => attributes.find((attribute) => String(attribute.id) === String(id))?.name).filter(Boolean).join('，') || item.attributeNames || '-'
     }))
   }
   if (kind.value !== 'product') return items
@@ -255,23 +295,79 @@ const withOptionLabels = (items) => {
 const parseMultiValue = (value) => Array.isArray(value) ? value : String(value || '').split(',').map((item) => item.trim()).filter(Boolean).map((item) => Number.isNaN(Number(item)) ? item : Number(item))
 const resetForm = (row = {}) => {
   Object.keys(form).forEach((key) => delete form[key])
-  cfg.value.fields.forEach((field) => { form[field.prop] = field.multiple ? parseMultiValue(row[field.prop] || row.ruleId) : field.prop === 'password' ? '' : row[field.prop] ?? (field.type === 'number' ? 0 : '') })
+  cfg.value.fields.forEach((field) => {
+    form[field.prop] = field.multiple ? parseMultiValue(row[field.prop] || row.ruleId) : field.prop === 'password' ? '' : row[field.prop] ?? (field.type === 'checkbox' ? false : field.type === 'number' ? (field.nullable ? null : 0) : '')
+    if (field.enableProp) form[field.enableProp] = row[field.enableProp] ?? false
+  })
   form.status = row.status || 'enabled'
   form.enabled = row.enabled ?? true
+}
+
+const renderOperationRuleChart = async () => {
+  if (kind.value !== 'operationLog') return
+  await nextTick()
+  if (!operationRuleChartRef.value) return
+  if (!operationRuleChart) operationRuleChart = echarts.init(operationRuleChartRef.value)
+  const data = operationActionStats.value.length ? operationActionStats.value : [{ name: '暂无操作', value: 0 }]
+  operationRuleChart.setOption({
+    title: { text: '操作统计', left: 0, textStyle: { color: '#21304d', fontWeight: 800, fontSize: 16 } },
+    tooltip: { trigger: 'item', formatter: '{b}<br/>{c} 次，占 {d}%' },
+    legend: { bottom: 0, left: 'center', type: 'scroll' },
+    series: [{
+      name: '操作数量',
+      type: 'pie',
+      radius: ['38%', '68%'],
+      center: ['50%', '48%'],
+      avoidLabelOverlap: true,
+      data,
+      itemStyle: { borderRadius: 0, borderColor: '#fff', borderWidth: 2 },
+      label: { formatter: '{b}\n{c}次' },
+      emphasis: { scale: true, scaleSize: 8 }
+    }]
+  })
+}
+
+const loadOperationRuleStats = async () => {
+  if (kind.value !== 'operationLog') return
+  try {
+    const stats = await resourceApi.stats('operationLog', { keyword: keyword.value })
+    operationActionStats.value = Object.entries(stats?.actionSummary || {}).map(([name, value]) => ({ name, value }))
+  } catch (error) {
+    let sourceRows = rows.value
+    try {
+      sourceRows = normalizeList(await resourceApi.list('operationLog', { keyword: keyword.value, page: 1, size: 200 }))
+    } catch (ignored) {}
+    operationActionStats.value = Object.entries(sourceRows.reduce((stats, row) => {
+      const action = row.action || '未知操作'
+      stats[action] = (stats[action] || 0) + 1
+      return stats
+    }, {})).map(([name, value]) => ({ name, value }))
+  }
+  renderOperationRuleChart()
 }
 
 const load = async () => {
   loading.value = true
   try {
     await loadOptions()
-    const payload = await resourceApi.list(kind.value, { keyword: keyword.value })
+    const params = pagedResource.value ? { keyword: keyword.value, page: page.current, size: page.size } : { keyword: keyword.value }
+    const payload = await resourceApi.list(kind.value, params)
     rows.value = withOptionLabels(normalizeList(payload))
+    total.value = Number(payload?.total ?? rows.value.length)
+    await loadOperationRuleStats()
   } catch (error) {
     quietError(error, '数据服务暂不可用，当前为演示数据')
     rows.value = withOptionLabels(fallback())
+    total.value = rows.value.length
+    await loadOperationRuleStats()
   } finally {
     loading.value = false
   }
+}
+
+const search = () => {
+  page.current = 1
+  load()
 }
 
 const openCreate = () => {
@@ -297,6 +393,11 @@ const saveRow = async () => {
   saving.value = true
   const payload = { ...form }
   cfg.value.fields.filter((field) => field.multiple).forEach((field) => { payload[field.prop] = (payload[field.prop] || []).join(',') })
+  cfg.value.fields.filter((field) => field.enableProp && !payload[field.enableProp]).forEach((field) => { payload[field.prop] = null })
+  cfg.value.fields.filter((field) => field.visibleWhen && !fieldVisible(field)).forEach((field) => {
+    payload[field.prop] = null
+    if (field.enableProp) payload[field.enableProp] = false
+  })
   if (kind.value === 'product' && payload.ruleIds) payload.ruleId = Number(String(payload.ruleIds).split(',')[0])
   if (kind.value === 'user' && editingId.value && !payload.password) delete payload.password
   try {
@@ -355,6 +456,30 @@ const submitSimulate = async () => {
   simulateVisible.value = false
 }
 
-watch(() => route.fullPath, load)
-onMounted(load)
+watch(() => route.fullPath, () => {
+  page.current = 1
+  load()
+})
+watch(() => [page.current, page.size], () => {
+  if (pagedResource.value) load()
+})
+const resizeOperationRuleChart = () => operationRuleChart?.resize()
+onMounted(() => {
+  load()
+  window.addEventListener('resize', resizeOperationRuleChart)
+})
+onBeforeUnmount(() => {
+  window.removeEventListener('resize', resizeOperationRuleChart)
+  operationRuleChart?.dispose()
+})
 </script>
+
+<style scoped>
+.range-limit-field {
+  display: grid;
+  grid-template-columns: 28px 1fr;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+}
+</style>

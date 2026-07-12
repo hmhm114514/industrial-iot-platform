@@ -11,7 +11,6 @@ import LocalCameraDevices from '../views/LocalCameraDevices.vue'
 import VideoSquare from '../views/VideoSquare.vue'
 import HistoryData from '../views/HistoryData.vue'
 import HistoryAlarms from '../views/HistoryAlarms.vue'
-import Tasks from '../views/Tasks.vue'
 import AiAgent from '../views/AiAgent.vue'
 import DevTools from '../views/DevTools.vue'
 import { flattenMenus, isSuperAdmin } from '../config/menu'
@@ -29,7 +28,6 @@ const specialComponents = {
   VideoSquare,
   HistoryData,
   HistoryAlarms,
-  Tasks,
   AiAgent,
   DevTools
 }

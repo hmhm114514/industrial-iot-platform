@@ -2,6 +2,8 @@
 backend/target/
 backend/bin/
 frontend/dist/
+frontend/.env.local
+frontend/.env.*.local
 
 # dependencies
 frontend/node_modules/

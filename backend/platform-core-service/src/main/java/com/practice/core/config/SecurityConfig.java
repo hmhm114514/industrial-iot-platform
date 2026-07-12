@@ -34,9 +34,10 @@ class RoleInterceptor implements org.springframework.web.servlet.HandlerIntercep
         if ("OPTIONS".equalsIgnoreCase(request.getMethod())) return true;
         String path=request.getRequestURI();
         if (path.startsWith("/api/users/password")) return true;
-        if (!(path.startsWith("/api/users")||path.startsWith("/api/roles")||path.startsWith("/api/firmwares")||path.startsWith("/api/operation-logs")||path.startsWith("/api/login-logs"))) return true;
-        String role=Optional.ofNullable(request.getHeader("X-User-Role")).orElse("");
-        if ("超级管理员".equals(role)||"SUPER_ADMIN".equals(role)||"admin".equals(role)) return true;
+        if (!(path.startsWith("/api/users")||path.startsWith("/api/roles")||path.startsWith("/api/firmwares")||path.startsWith("/api/operation-logs"))) return true;
+        String username=Optional.ofNullable(request.getHeader("X-User-Name")).orElse("").trim();
+        String role=Optional.ofNullable(request.getHeader("X-User-Role")).orElse("").trim();
+        if ("admin".equalsIgnoreCase(username)||"超级管理员".equals(role)||"SUPER_ADMIN".equalsIgnoreCase(role)||"admin".equalsIgnoreCase(role)) return true;
         response.setStatus(403); response.setContentType(MediaType.APPLICATION_JSON_VALUE + ";charset=UTF-8");
         response.getWriter().write("{\"code\":403,\"message\":\"无权访问系统设置\",\"data\":null}"); return false;
     }

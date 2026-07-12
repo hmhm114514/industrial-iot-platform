@@ -23,7 +23,7 @@
           <el-table :data="filteredRows" stripe>
             <el-table-column prop="name" label="规则名称" min-width="190" />
             <el-table-column prop="metric" label="指标" width="120" />
-            <el-table-column label="条件" width="420"><template #default="{ row }">{{ row.metric }} {{ row.operator }} {{ row.threshold }}</template></el-table-column>
+            <el-table-column label="条件" width="420"><template #default="{ row }">{{ conditionText(row) }}</template></el-table-column>
             <el-table-column prop="level" label="等级" width="90"><template #default="{ row }"><el-tag :type="row.level === '高' ? 'danger' : 'warning'" round>{{ row.level }}</el-tag></template></el-table-column>
             <el-table-column prop="action" label="动作" min-width="180" />
             <el-table-column label="启用" width="90"><template #default="{ row }"><el-switch v-model="row.enabled" @change="toggle(row)" /></template></el-table-column>
@@ -42,8 +42,33 @@
       <el-form ref="formRef" :model="form" :rules="rules" label-width="110px">
         <el-form-item label="规则名称" prop="name"><el-input v-model="form.name" /></el-form-item>
         <el-form-item label="数据指标" prop="metric"><el-select v-model="form.metric" class="full"><el-option v-for="item in metrics" :key="item.value" :label="item.label" :value="item.value" /></el-select></el-form-item>
-        <el-form-item label="判断符" prop="operator"><el-select v-model="form.operator" class="full"><el-option label=">" value=">" /><el-option label=">=" value=">=" /><el-option label="<" value="<" /><el-option label="<=" value="<=" /><el-option label="==" value="==" /></el-select></el-form-item>
-        <el-form-item label="阈值" prop="threshold"><el-input-number v-model="form.threshold" class="full" :min="-50" :max="150" /></el-form-item>
+        <el-form-item label="判断符" prop="operator"><el-select v-model="form.operator" class="full"><el-option v-for="item in operatorOptions(form.metric)" :key="item.value" :label="item.label" :value="item.value" /></el-select></el-form-item>
+        <el-form-item label="阈值" prop="threshold">
+          <el-select v-if="attributeType(form.metric) === 'BOOL'" v-model="form.threshold" class="full">
+            <el-option label="True" value="True" />
+            <el-option label="False" value="False" />
+          </el-select>
+          <el-input v-else-if="attributeType(form.metric) === 'STRING'" v-model="form.threshold" class="full" placeholder="请输入字符阈值" />
+          <el-input-number v-else v-model="form.threshold" class="full" :step="attributeType(form.metric) === 'INT' ? 1 : 0.1" />
+        </el-form-item>
+        <el-form-item label="条件关系">
+          <el-select v-model="form.logicOperator" class="full" clearable placeholder="单条件">
+            <el-option label="AND（同时满足）" value="AND" />
+            <el-option label="OR（任一满足）" value="OR" />
+          </el-select>
+        </el-form-item>
+        <template v-if="form.logicOperator">
+          <el-form-item label="第二指标" prop="secondMetric"><el-select v-model="form.secondMetric" class="full"><el-option v-for="item in metrics" :key="item.value" :label="item.label" :value="item.value" /></el-select></el-form-item>
+          <el-form-item label="第二判断符" prop="secondOperator"><el-select v-model="form.secondOperator" class="full"><el-option v-for="item in operatorOptions(form.secondMetric)" :key="item.value" :label="item.label" :value="item.value" /></el-select></el-form-item>
+          <el-form-item label="第二阈值" prop="secondThreshold">
+            <el-select v-if="attributeType(form.secondMetric) === 'BOOL'" v-model="form.secondThreshold" class="full">
+              <el-option label="True" value="True" />
+              <el-option label="False" value="False" />
+            </el-select>
+            <el-input v-else-if="attributeType(form.secondMetric) === 'STRING'" v-model="form.secondThreshold" class="full" placeholder="请输入字符阈值" />
+            <el-input-number v-else v-model="form.secondThreshold" class="full" :step="attributeType(form.secondMetric) === 'INT' ? 1 : 0.1" />
+          </el-form-item>
+        </template>
         <el-form-item label="告警等级" prop="level"><el-select v-model="form.level" class="full"><el-option label="高" value="高" /><el-option label="中" value="中" /><el-option label="低" value="低" /></el-select></el-form-item>
         <el-form-item label="触发动作" prop="action">
           <el-select v-model="form.action" class="full" placeholder="请选择触发动作">
@@ -58,7 +83,7 @@
 </template>
 
 <script setup>
-import { computed, nextTick, onBeforeUnmount, onMounted, reactive, ref } from 'vue'
+import { computed, nextTick, onBeforeUnmount, onMounted, reactive, ref, watch } from 'vue'
 import * as echarts from 'echarts'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { resourceApi } from '../api/platform'
@@ -73,29 +98,53 @@ const editingId = ref(null)
 const formRef = ref(null)
 const metricChartRef = ref(null)
 let metricChart
-const form = reactive({ name: '', metric: 'temperature', operator: '>', threshold: 38, level: '高', action: '生成告警并通知运维', enabled: true })
+let fillingForm = false
+const attributes = ref([])
+const form = reactive({ name: '', metric: '', operator: '>', threshold: 38, logicOperator: '', secondMetric: '', secondOperator: '>', secondThreshold: 38, level: '高', action: '生成告警并通知运维', enabled: true })
 const actionOptions = ['生成告警', '生成告警并通知运维', '仅记录规则审计']
-const metrics = [
-  { label: '温度 temperature', value: 'temperature' },
-  { label: '湿度 humidity', value: 'humidity' },
-  { label: '压力 pressure', value: 'pressure' },
-  { label: '振动 vibration', value: 'vibration' },
-  { label: '电流 current', value: 'current' },
-  { label: '电压 voltage', value: 'voltage' },
-  { label: '功率 power', value: 'power' },
-  { label: '转速 speed', value: 'speed' }
-]
+const numericOperators = [{ label: '等于', value: '==' }, { label: '不等于', value: '!=' }, { label: '大于等于', value: '>=' }, { label: '小于等于', value: '<=' }, { label: '大于', value: '>' }, { label: '小于', value: '<' }]
+const equalityOperators = [{ label: '等于', value: '==' }, { label: '不等于', value: '!=' }]
+const fallbackMetrics = ['temperature', 'humidity', 'pressure'].map((name) => ({ label: name, value: name }))
+const metrics = computed(() => {
+  const options = attributes.value.map((item) => ({ label: `${item.name}（${item.valueTypeText || item.valueType || '属性'}）`, value: item.name }))
+  return options.length ? options : fallbackMetrics
+})
 const rules = {
   name: [{ required: true, message: '请输入规则名称', trigger: 'blur' }],
   metric: [{ required: true, message: '请选择数据指标', trigger: 'change' }],
   operator: [{ required: true, message: '请选择判断符', trigger: 'change' }],
   threshold: [{ required: true, message: '请输入阈值', trigger: 'change' }],
+  secondMetric: [{ required: true, message: '请选择第二指标', trigger: 'change' }],
+  secondOperator: [{ required: true, message: '请选择第二判断符', trigger: 'change' }],
+  secondThreshold: [{ required: true, message: '请输入第二阈值', trigger: 'change' }],
   level: [{ required: true, message: '请选择告警等级', trigger: 'change' }],
   action: [{ required: true, message: '请选择触发动作', trigger: 'change' }]
 }
 const filteredRows = computed(() => rows.value.filter((row) => !keyword.value || JSON.stringify(row).includes(keyword.value)))
-const metricName = (value) => metrics.find((item) => item.value === value)?.label.split(' ')[0] || value || '未知'
-const metricStats = computed(() => metrics.map((metric) => ({
+const metricName = (value) => metrics.value.find((item) => item.value === value)?.label.replace(/（.*$/, '') || value || '未知'
+const attributeOf = (metric) => attributes.value.find((item) => item.name === metric)
+const attributeType = (metric) => attributeOf(metric)?.valueType || 'FLOAT'
+const operatorOptions = (metric) => ['BOOL', 'STRING'].includes(attributeType(metric)) ? equalityOperators : numericOperators
+const defaultOperator = (metric) => operatorOptions(metric)[0]?.value || '=='
+const defaultThreshold = (metric) => {
+  const type = attributeType(metric)
+  if (type === 'BOOL') return 'True'
+  if (type === 'STRING') return ''
+  return 0
+}
+const normalizeCondition = (metricKey, operatorKey, thresholdKey, resetThreshold = false) => {
+  const options = operatorOptions(form[metricKey]).map((item) => item.value)
+  if (!options.includes(form[operatorKey])) form[operatorKey] = defaultOperator(form[metricKey])
+  const type = attributeType(form[metricKey])
+  if (type === 'BOOL' && !['True', 'False'].includes(form[thresholdKey])) form[thresholdKey] = 'True'
+  if (type === 'STRING' && (resetThreshold || form[thresholdKey] == null || typeof form[thresholdKey] !== 'string' || ['True', 'False'].includes(form[thresholdKey]))) form[thresholdKey] = ''
+  if (['INT', 'FLOAT'].includes(type) && (form[thresholdKey] === '' || form[thresholdKey] == null || Number.isNaN(Number(form[thresholdKey])))) form[thresholdKey] = defaultThreshold(form[metricKey])
+}
+const conditionText = (row) => {
+  const first = `${row.metric} ${row.operator} ${row.threshold}`
+  return row.logicOperator ? `${first} ${row.logicOperator} ${row.secondMetric} ${row.secondOperator} ${row.secondThreshold}` : first
+}
+const metricStats = computed(() => metrics.value.map((metric) => ({
   name: metricName(metric.value),
   count: rows.value.filter((row) => row.metric === metric.value).length
 })))
@@ -122,26 +171,62 @@ const resizeMetricChart = () => metricChart?.resize()
 
 const load = async () => {
   try {
-    const payload = await resourceApi.list('rule', { keyword: keyword.value })
+    const [payload, attributeRows] = await Promise.all([
+      resourceApi.list('rule', { keyword: keyword.value }),
+      resourceApi.list('deviceAttribute')
+    ])
     rows.value = normalizeList(payload)
+    attributes.value = normalizeList(attributeRows)
   } catch (error) {
     quietError(error, '数据服务暂不可用，当前为演示数据')
     rows.value = clone(fallbackRows.rule)
+    attributes.value = clone(fallbackRows.deviceAttribute || [])
   }
   renderMetricChart()
 }
-const fill = (row = {}) => Object.assign(form, { name: row.name || '', metric: row.metric || 'temperature', operator: row.operator || '>', threshold: row.threshold ?? 38, level: row.level || '高', action: row.action || '生成告警并通知运维', enabled: row.enabled ?? true })
+const defaultMetric = () => metrics.value[0]?.value || ''
+const fill = (row = {}) => {
+  fillingForm = true
+  Object.assign(form, { name: row.name || '', metric: row.metric || defaultMetric(), operator: row.operator || defaultOperator(row.metric || defaultMetric()), threshold: row.threshold ?? defaultThreshold(row.metric || defaultMetric()), logicOperator: row.logicOperator || '', secondMetric: row.secondMetric || defaultMetric(), secondOperator: row.secondOperator || defaultOperator(row.secondMetric || defaultMetric()), secondThreshold: row.secondThreshold ?? defaultThreshold(row.secondMetric || defaultMetric()), level: row.level || '高', action: row.action || '生成告警并通知运维', enabled: row.enabled ?? true })
+  normalizeCondition('metric', 'operator', 'threshold')
+  normalizeCondition('secondMetric', 'secondOperator', 'secondThreshold')
+  nextTick(() => { fillingForm = false })
+}
 const openCreate = () => { editingId.value = null; fill(); visible.value = true }
 const openEdit = (row) => { editingId.value = row.id; fill(row); visible.value = true }
+const conditionPossible = (metric, operator, threshold) => {
+  const attr = attributes.value.find((item) => item.name === metric)
+  if (!attr || !['INT', 'FLOAT'].includes(attr.valueType)) return true
+  const value = Number(threshold)
+  if (Number.isNaN(value)) return false
+  const minActive = attr.minEnabled ?? attr.rangeEnabled
+  const maxActive = attr.maxEnabled ?? attr.rangeEnabled
+  const min = minActive ? attr.minValue : null
+  const max = maxActive ? attr.maxValue : null
+  if (operator === '>') return max == null || max > value
+  if (operator === '>=') return max == null || max >= value
+  if (operator === '<') return min == null || min < value
+  if (operator === '<=') return min == null || min <= value
+  if (operator === '==') return (min == null || value >= min) && (max == null || value <= max)
+  if (operator === '!=') return min == null || max == null || min !== max || min !== value
+  return true
+}
 const save = async () => {
   const valid = await formRef.value?.validate().catch(() => false)
   if (!valid) return
+  if (!conditionPossible(form.metric, form.operator, form.threshold) || (form.logicOperator && !conditionPossible(form.secondMetric, form.secondOperator, form.secondThreshold))) {
+    ElMessage.error('规则条件与设备属性范围无交集，无法建立规则')
+    return
+  }
   const payload = { ...form, alarmLevel: ({ 高: 'HIGH', 中: 'MEDIUM', 低: 'LOW' }[form.level] || form.level), status: form.enabled ? 'ENABLED' : 'DISABLED' }
+  if (!payload.logicOperator) { payload.secondMetric = null; payload.secondOperator = null; payload.secondThreshold = null }
   try { editingId.value ? await resourceApi.update('rule', editingId.value, payload) : await resourceApi.create('rule', payload); ElMessage.success('规则已保存'); await load() } catch (error) { quietError(error, '规则保存失败，后端数据未变更') }
   visible.value = false
 }
 const remove = async (row) => { await ElMessageBox.confirm(`确认删除规则“${row.name}”？`, '提示', { type: 'warning' }); try { await resourceApi.remove('rule', row.id); await load() } catch (error) { quietError(error, '规则删除失败，后端数据未变更') } }
 const toggle = async (row) => { try { await resourceApi.toggle('rule', row.id, row.enabled); ElMessage.success('启用状态已更新'); await load() } catch (error) { row.enabled = !row.enabled; quietError(error, '规则启停失败，后端数据未变更') } }
+watch(() => form.metric, () => { if (!fillingForm) normalizeCondition('metric', 'operator', 'threshold', true) })
+watch(() => form.secondMetric, () => { if (!fillingForm) normalizeCondition('secondMetric', 'secondOperator', 'secondThreshold', true) })
 onMounted(() => {
   load()
   window.addEventListener('resize', resizeMetricChart)

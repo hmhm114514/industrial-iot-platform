@@ -4,6 +4,7 @@ export const menus = [
     title: '设备管理',
     icon: 'Box',
     children: [
+      { title: '设备属性', path: '/device/attributes', kind: 'deviceAttribute' },
       { title: '产品分类', path: '/device/product-categories', kind: 'productCategory' },
       { title: '产品管理', path: '/device/products', kind: 'product' },
       { title: '设备分组', path: '/device/groups', kind: 'deviceGroup' },
@@ -54,22 +55,13 @@ export const menus = [
     ]
   },
   {
-    title: '任务中心',
-    icon: 'Timer',
-    children: [
-      { title: '任务中心', path: '/tasks', special: 'Tasks' },
-      { title: '任务日志', path: '/tasks/logs', kind: 'taskLog' }
-    ]
-  },
-  {
     title: '系统设置',
     icon: 'Setting',
     children: [
       { title: '用户管理', path: '/system/users', kind: 'user' },
       { title: '角色管理', path: '/system/roles', kind: 'role' },
       { title: '固件管理', path: '/system/firmwares', kind: 'firmware' },
-      { title: '操作日志', path: '/system/operation-logs', kind: 'operationLog' },
-      { title: '登录日志', path: '/system/login-logs', kind: 'loginLog' }
+      { title: '操作日志', path: '/system/operation-logs', kind: 'operationLog' }
     ]
   },
   {
@@ -84,7 +76,8 @@ export const menus = [
 
 export const isSuperAdmin = (user = {}) => {
   const role = user.roleName || user.role || ''
-  return role === '超级管理员' || role === 'SUPER_ADMIN' || role === 'admin'
+  const username = user.username || user.name || ''
+  return username === 'admin' || role === '超级管理员' || role === 'SUPER_ADMIN' || role === 'admin'
 }
 
 export const filterMenusByRole = (items = menus, user = {}) => items

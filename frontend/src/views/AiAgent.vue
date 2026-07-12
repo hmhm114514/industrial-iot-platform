@@ -44,7 +44,6 @@
           <div class="config-head">
             <div>
               <strong>大模型接入配置</strong>
-              <span>默认使用课程接口文档中的 MaaS 兼容地址；API Key 可在此粘贴，也可留空使用本机示例配置。</span>
             </div>
             <el-button :loading="testingModels" @click="testModels">测试连接</el-button>
           </div>
@@ -96,7 +95,7 @@
             placeholder="请输入需要分析的设备运行问题，例如：注塑机温度持续偏高，应该如何处置？"
           />
           <div class="input-actions">
-            <span>建议描述设备、告警、最近数据或现场现象，便于生成更贴合的建议。</span>
+            <span> </span>
             <el-button type="primary" :loading="thinking" @click="sendQuestion">生成建议</el-button>
           </div>
         </div>
@@ -117,12 +116,12 @@ const fallbackAgents = [
   { id: 'demo-status', code: 'device-status', name: '设备状态分析助手', scenario: '状态分析', description: '汇总在线、遥测、告警和任务状态。' }
 ]
 
-const quickQuestions = [
-  '解释当前高温告警的可能原因',
-  '生成今日设备巡检计划',
-  '总结设备在线状态和风险点',
-  '优化温度阈值规则配置'
-]
+// const quickQuestions = [
+//   '解释当前高温告警的可能原因',
+//   '生成今日设备巡检计划',
+//   '总结设备在线状态和风险点',
+//   '优化温度阈值规则配置'
+// ]
 
 const agents = ref([])
 const selectedAgent = ref(null)

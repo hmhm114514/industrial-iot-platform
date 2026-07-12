@@ -4,4 +4,4 @@ import java.time.LocalDateTime;
 import com.practice.common.BaseEntity;
 
     @Entity
-    public class Device extends BaseEntity { public Long productId; public Long groupId; public String deviceKey; public String location; public Double latitude; public Double longitude; public LocalDateTime lastOnlineAt; @Transient public Double temperature; }
+    public class Device extends BaseEntity { public Long productId; public Long groupId; public Long ruleId; public String ruleIds; public String deviceKey; public String location; public Double latitude; public Double longitude; public LocalDateTime lastOnlineAt; @Transient public Double temperature; }

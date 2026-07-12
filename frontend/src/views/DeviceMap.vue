@@ -2,7 +2,7 @@
   <div class="device-map-page page-stack">
     <section class="module-head map-head">
       <div>
-        <el-tag effect="dark" class="hero-tag">真实地图</el-tag>
+        <!-- <el-tag effect="dark" class="hero-tag">真实地图</el-tag> -->
         <h1>设备地图</h1>
       </div>
       <div class="module-actions">
@@ -27,6 +27,14 @@
       class="map-alert"
     />
     <el-alert
+      v-else-if="tileError"
+      title="高德地图加载失败，请检查 VITE_AMAP_KEY 配置；当前已切换为本地坐标底图"
+      type="warning"
+      show-icon
+      :closable="false"
+      class="map-alert"
+    />
+    <el-alert
       v-else-if="missingCount > 0"
       :title="`共 ${totalCount} 台设备，${missingCount} 台缺少经纬度未显示`"
       type="info"
@@ -36,13 +44,14 @@
     />
 
     <section class="map-layout">
-      <div class="map-shell-real">
-        <div ref="mapRef" class="leaflet-map" />
+      <div class="map-shell-real" :class="{ 'tile-fallback': tileError }">
+        <div ref="mapRef" class="amap-map" />
         <div class="map-overlay-card">
           <span>{{ demoMode ? '演示模式' : '平台数据' }}</span>
           <strong>{{ markerDevices.length }}</strong>
           <em>{{ demoMode ? '演示点位' : '已显示设备' }}</em>
         </div>
+        <div v-if="tileError" class="map-tile-status">高德地图未加载</div>
         <div v-if="loading" class="map-loading">正在加载设备坐标...</div>
       </div>
 
@@ -52,7 +61,7 @@
             <span>设备列表</span>
             <strong>{{ filteredDevices.length }}/{{ totalCount }}</strong>
           </div>
-          <el-tag size="small" effect="plain">OSM</el-tag>
+          <el-tag size="small" effect="plain">高德</el-tag>
         </div>
         <div class="map-legend-real">
           <span><i class="online" />在线</span>
@@ -84,8 +93,6 @@
 <script setup>
 import { computed, nextTick, onBeforeUnmount, onMounted, ref } from 'vue'
 import { ElMessage } from 'element-plus'
-import L from 'leaflet'
-import 'leaflet/dist/leaflet.css'
 import { resourceApi } from '../api/platform'
 import { quietError } from '../api/http'
 
@@ -93,13 +100,18 @@ const keyword = ref('')
 const mapRef = ref(null)
 const loading = ref(false)
 const demoMode = ref(false)
+const tileError = ref(false)
 const totalCount = ref(0)
 const missingCount = ref(0)
 const markerDevices = ref([])
 
 let mapInstance = null
-let markerLayer = null
+let AMapApi = null
+let activeInfoWindow = null
 const markerMap = new Map()
+const AMAP_KEY = import.meta.env.VITE_AMAP_KEY || ''
+const AMAP_SECURITY_CODE = import.meta.env.VITE_AMAP_SECURITY_CODE || ''
+const DEFAULT_CENTER = [121.4737, 31.2304]
 
 const fallbackDevices = [
   { id: 'demo-shanghai', name: '演示点位-上海临港网关', status: 'ONLINE', location: '上海临港', latitude: 30.9006, longitude: 121.9289, lastOnlineAt: '2026-07-04 09:30:00' },
@@ -179,48 +191,94 @@ const popupHtml = (device) => `
   </div>
 `
 
-const markerIcon = (device) => L.divIcon({
-  className: `iot-map-marker ${device.tone}`,
-  html: '<span>●</span>',
-  iconSize: [34, 34],
-  iconAnchor: [17, 17],
-  popupAnchor: [0, -18]
+const markerContent = (device) => `<div class="iot-map-marker ${escapeHtml(device.tone)}"><span>●</span></div>`
+
+const loadAmap = () => new Promise((resolve, reject) => {
+  if (window.AMap) {
+    resolve(window.AMap)
+    return
+  }
+  if (!AMAP_KEY) {
+    reject(new Error('请配置 VITE_AMAP_KEY 后使用高德地图'))
+    return
+  }
+  if (AMAP_SECURITY_CODE) {
+    window._AMapSecurityConfig = { securityJsCode: AMAP_SECURITY_CODE }
+  }
+  const existing = document.getElementById('amap-jsapi')
+  if (existing) {
+    existing.addEventListener('load', () => resolve(window.AMap), { once: true })
+    existing.addEventListener('error', () => reject(new Error('高德地图脚本加载失败')), { once: true })
+    return
+  }
+  const script = document.createElement('script')
+  script.id = 'amap-jsapi'
+  script.src = `https://webapi.amap.com/maps?v=2.0&key=${encodeURIComponent(AMAP_KEY)}&plugin=AMap.Scale,AMap.ToolBar`
+  script.async = true
+  script.onload = () => resolve(window.AMap)
+  script.onerror = () => reject(new Error('高德地图脚本加载失败'))
+  document.head.appendChild(script)
 })
 
-const initMap = () => {
+const initMap = async () => {
   if (mapInstance || !mapRef.value) return
 
-  mapInstance = L.map(mapRef.value, { zoomControl: false }).setView([31.2304, 121.4737], 6)
-  L.control.zoom({ position: 'bottomright' }).addTo(mapInstance)
-  L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
-    maxZoom: 19,
-    attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
-  }).addTo(mapInstance)
-  markerLayer = L.layerGroup().addTo(mapInstance)
+  try {
+    AMapApi = await loadAmap()
+    mapInstance = new AMapApi.Map(mapRef.value, {
+      zoom: 6,
+      center: DEFAULT_CENTER,
+      viewMode: '2D',
+      resizeEnable: true
+    })
+    mapInstance.addControl(new AMapApi.Scale())
+    mapInstance.addControl(new AMapApi.ToolBar({
+      position: { right: '16px', bottom: '16px' }
+    }))
+    tileError.value = false
+  } catch (error) {
+    tileError.value = true
+    ElMessage.warning(error.message || '高德地图加载失败')
+  }
 }
 
 const fitMapToDevices = () => {
   if (!mapInstance) return
   if (!markerDevices.value.length) {
-    mapInstance.setView([31.2304, 121.4737], 6)
+    mapInstance.setZoomAndCenter(6, DEFAULT_CENTER)
     return
   }
-  const bounds = L.latLngBounds(markerDevices.value.map((device) => [device.latitude, device.longitude]))
-  mapInstance.fitBounds(bounds, { padding: [48, 48], maxZoom: 13 })
+  const markers = Array.from(markerMap.values())
+  if (markers.length) mapInstance.setFitView(markers, false, [48, 48, 48, 48], 13)
 }
 
 const renderMarkers = () => {
-  if (!markerLayer) return
-  markerLayer.clearLayers()
+  if (!mapInstance || !AMapApi) return
+  const oldMarkers = Array.from(markerMap.values())
+  if (oldMarkers.length) mapInstance.remove(oldMarkers)
   markerMap.clear()
+  activeInfoWindow?.close()
+  activeInfoWindow = null
 
   markerDevices.value.forEach((device) => {
-    const marker = L.marker([device.latitude, device.longitude], { icon: markerIcon(device) }).bindPopup(popupHtml(device))
-    marker.addTo(markerLayer)
+    const marker = new AMapApi.Marker({
+      position: [device.longitude, device.latitude],
+      content: markerContent(device),
+      offset: new AMapApi.Pixel(-17, -17)
+    })
+    const infoWindow = new AMapApi.InfoWindow({
+      content: popupHtml(device),
+      offset: new AMapApi.Pixel(0, -18)
+    })
+    marker.on('click', () => {
+      activeInfoWindow = infoWindow
+      infoWindow.open(mapInstance, [device.longitude, device.latitude])
+    })
+    mapInstance.add(marker)
     markerMap.set(device.id, marker)
   })
   fitMapToDevices()
-  nextTick(() => mapInstance?.invalidateSize())
+  nextTick(() => mapInstance?.resize())
 }
 
 const applyDevices = (devices, isFallback = false) => {
@@ -249,9 +307,14 @@ const loadDevices = async () => {
 
 const focusDevice = (device) => {
   const marker = markerMap.get(device.id)
-  if (!mapInstance || !marker) return
-  mapInstance.flyTo([device.latitude, device.longitude], Math.max(mapInstance.getZoom(), 14), { duration: 0.8 })
-  marker.openPopup()
+  if (!mapInstance || !AMapApi || !marker) return
+  const position = [device.longitude, device.latitude]
+  mapInstance.setZoomAndCenter(Math.max(mapInstance.getZoom(), 14), position)
+  activeInfoWindow = new AMapApi.InfoWindow({
+    content: popupHtml(device),
+    offset: new AMapApi.Pixel(0, -18)
+  })
+  activeInfoWindow.open(mapInstance, position)
 }
 
 const locateFirstMatched = () => {
@@ -268,14 +331,16 @@ const locateFirstMatched = () => {
   focusDevice(target)
 }
 
-const invalidateMapSize = () => mapInstance?.invalidateSize()
+const invalidateMapSize = () => mapInstance?.resize()
 
 onMounted(async () => {
   await nextTick()
-  initMap()
+  await initMap()
   await loadDevices()
   invalidateMapSize()
   setTimeout(invalidateMapSize, 160)
+  setTimeout(invalidateMapSize, 500)
+  setTimeout(invalidateMapSize, 1000)
   window.addEventListener('resize', invalidateMapSize)
 })
 
@@ -283,9 +348,10 @@ onBeforeUnmount(() => {
   window.removeEventListener('resize', invalidateMapSize)
   markerMap.clear()
   if (mapInstance) {
-    mapInstance.remove()
+    mapInstance.destroy()
     mapInstance = null
-    markerLayer = null
+    AMapApi = null
+    activeInfoWindow = null
   }
 })
 </script>
@@ -376,11 +442,26 @@ onBeforeUnmount(() => {
   box-shadow: 0 28px 70px rgba(16, 37, 31, .18);
 }
 
-.leaflet-map {
+.map-shell-real.tile-fallback {
+  background:
+    radial-gradient(circle at 28% 24%, rgba(31,107,84,.18), transparent 26%),
+    radial-gradient(circle at 68% 60%, rgba(217,154,50,.16), transparent 28%),
+    linear-gradient(135deg, #dff0df, #eef7e9);
+}
+
+.amap-map {
   width: 100%;
   height: 100%;
   min-height: 520px;
   z-index: 1;
+}
+
+.map-shell-real.tile-fallback .amap-map {
+  background:
+    linear-gradient(rgba(31,107,84,.11) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(31,107,84,.11) 1px, transparent 1px),
+    linear-gradient(135deg, rgba(223,240,223,.92), rgba(242,247,230,.88));
+  background-size: 56px 56px, 56px 56px, 100% 100%;
 }
 
 .map-shell-real::after {
@@ -393,7 +474,8 @@ onBeforeUnmount(() => {
 }
 
 .map-overlay-card,
-.map-loading {
+.map-loading,
+.map-tile-status {
   position: absolute;
   z-index: 3;
   border: 1px solid rgba(255,255,255,.58);
@@ -433,6 +515,15 @@ onBeforeUnmount(() => {
   transform: translate(-50%, -50%);
   padding: 12px 18px;
   border-radius: 999px;
+  font-weight: 800;
+}
+
+.map-tile-status {
+  right: 22px;
+  bottom: 22px;
+  padding: 9px 13px;
+  border-radius: 999px;
+  font-size: 12px;
   font-weight: 800;
 }
 
@@ -556,23 +647,24 @@ onBeforeUnmount(() => {
   line-height: 1.7;
 }
 
-:deep(.device-map-popup) {
+:global(.device-map-popup) {
   min-width: 190px;
   color: #13251f;
+  font-family: "HarmonyOS Sans SC", "PingFang SC", "Microsoft YaHei UI", sans-serif;
 }
 
-:deep(.device-map-popup strong) {
+:global(.device-map-popup strong) {
   display: block;
   margin-bottom: 8px;
   font-size: 15px;
 }
 
-:deep(.device-map-popup p) {
+:global(.device-map-popup p) {
   margin: 6px 0 0;
   color: #53635d;
 }
 
-:deep(.popup-status) {
+:global(.popup-status) {
   display: inline-flex;
   padding: 3px 8px;
   border-radius: 999px;
@@ -580,12 +672,12 @@ onBeforeUnmount(() => {
   font-size: 12px;
 }
 
-:deep(.popup-status.online) { background: #10b981; }
-:deep(.popup-status.offline) { background: #64748b; }
-:deep(.popup-status.alarm) { background: #f43f5e; }
-:deep(.popup-status.disabled) { background: #f59e0b; }
+:global(.popup-status.online) { background: #10b981; }
+:global(.popup-status.offline) { background: #64748b; }
+:global(.popup-status.alarm) { background: #f43f5e; }
+:global(.popup-status.disabled) { background: #f59e0b; }
 
-:deep(.leaflet-container) {
+:global(.amap-container) {
   font-family: "HarmonyOS Sans SC", "PingFang SC", "Microsoft YaHei UI", sans-serif;
 }
 
@@ -609,7 +701,7 @@ onBeforeUnmount(() => {
     min-height: 560px;
   }
 
-  .leaflet-map {
+  .amap-map {
     min-height: 560px;
   }
 }

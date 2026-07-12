@@ -4,7 +4,6 @@
       <div>
         <span class="monitor-device-kicker">视频中心 · 监控资产</span>
         <h1>监控设备</h1>
-        <p>登记当前浏览器工作站可使用的本机摄像头，并维护生产用途、安装位置和启停状态。</p>
       </div>
       <div class="monitor-device-hero-actions">
         <span class="monitor-workstation-chip">{{ workstationLabel }}</span>
@@ -19,10 +18,10 @@
     </div>
 
     <section class="monitor-stat-grid" aria-label="监控设备统计">
-      <div class="monitor-stat-card"><span>全部档案</span><strong>{{ statistics.total }}</strong><small>本地摄像头资产</small></div>
-      <div class="monitor-stat-card accent"><span>当前工作站</span><strong>{{ statistics.current }}</strong><small>已绑定到本浏览器</small></div>
-      <div class="monitor-stat-card success"><span>当前可用</span><strong>{{ statistics.available }}</strong><small>{{ detectionSummary }}</small></div>
-      <div class="monitor-stat-card muted"><span>停用设备</span><strong>{{ statistics.disabled }}</strong><small>所有工作站档案</small></div>
+      <div class="monitor-stat-card"><span>全部档案</span><strong>{{ statistics.total }}</strong><small></small></div>
+      <div class="monitor-stat-card accent"><span>当前工作站</span><strong>{{ statistics.current }}</strong><small></small></div>
+      <div class="monitor-stat-card success"><span>当前可用</span><strong>{{ statistics.available }}</strong><small>{{  }}</small></div>
+      <div class="monitor-stat-card muted"><span>停用设备</span><strong>{{ statistics.disabled }}</strong><small></small></div>
     </section>
 
     <section class="monitor-device-toolbar">
